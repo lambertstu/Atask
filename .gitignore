@@ -1,0 +1,25 @@
+# Environments
+.env
+*.env
+
+# Output and build files
+*.out
+
+# JSON files
+*.json
+*.jsonl
+
+# IDEs
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Agent Local Data
+.memory/
+.tasks/
+.runtime-tasks/
+.claude/
+agent-transcripts/
+terminals/
