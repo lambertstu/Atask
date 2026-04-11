@@ -103,10 +103,18 @@ func (tm *TaskManager) Get(taskID int) string {
 	return string(data)
 }
 
-func (tm *TaskManager) Update(taskID int, status, owner string, addBlockedBy, addBlocks []int) string {
+func (tm *TaskManager) Update(taskID int, subject, description, status, owner string, addBlockedBy, addBlocks []int) string {
 	task, err := tm.load(taskID)
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err)
+	}
+
+	if subject != "" {
+		task.Subject = subject
+	}
+
+	if description != "" {
+		task.Description = description
 	}
 
 	if owner != "" {
@@ -294,6 +302,8 @@ func (t *TaskUpdateTool) Description() string {
 
 func (t *TaskUpdateTool) Execute(ctx context.Context, args map[string]interface{}) string {
 	taskID := utils.GetIntFromMap(args, "task_id")
+	subject := utils.GetStringFromMap(args, "subject")
+	description := utils.GetStringFromMap(args, "description")
 	status := utils.GetStringFromMap(args, "status")
 	owner := utils.GetStringFromMap(args, "owner")
 	addBlockedBy := utils.GetIntArrayFromMap(args, "add_blocked_by")
@@ -302,7 +312,7 @@ func (t *TaskUpdateTool) Execute(ctx context.Context, args map[string]interface{
 	if taskID == 0 {
 		return "Error: task_id is required"
 	}
-	return t.manager.Update(taskID, status, owner, addBlockedBy, addBlocks)
+	return t.manager.Update(taskID, subject, description, status, owner, addBlockedBy, addBlocks)
 }
 
 func (t *TaskUpdateTool) Schema() openai.Tool {
@@ -317,6 +327,14 @@ func (t *TaskUpdateTool) Schema() openai.Tool {
 					"task_id": map[string]interface{}{
 						"type":        "integer",
 						"description": "Task ID",
+					},
+					"subject": map[string]interface{}{
+						"type":        "string",
+						"description": "New task subject/title (optional)",
+					},
+					"description": map[string]interface{}{
+						"type":        "string",
+						"description": "New task description (optional)",
 					},
 					"status": map[string]interface{}{
 						"type":        "string",

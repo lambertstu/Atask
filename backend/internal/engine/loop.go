@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"agent-base/pkg/utils"
 
@@ -71,29 +69,11 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 				output = fmt.Sprintf("Permission denied: %s", decision["reason"])
 				fmt.Printf("\033[31m[DENIED] %s: %s\033[0m\n", toolCall.Function.Name, decision["reason"])
 			} else if decision["behavior"] == "ask" {
-				if decision["needs_path_auth"] == true {
-					requestedPath := decision["requested_path"].(string)
-					requestedDir := filepath.Dir(requestedPath)
-
-					fmt.Printf("\033[33m[PATH AUTH]\033[0m Grant access to directory: %s? (y/n): ", requestedDir)
-					var response string
-					fmt.Scanln(&response)
-
-					if strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-						e.permissionMgr.AddAllowedDir(requestedDir)
-						fmt.Printf("\033[32m[AUTHORIZED]\033[0m %s\n", requestedDir)
-						output = e.executeTool(toolCall, args)
-					} else {
-						output = fmt.Sprintf("Path access denied: %s", requestedPath)
-						fmt.Printf("\033[31m[PATH DENIED]\033[0m %s\n", requestedPath)
-					}
+				if e.permissionMgr.HandleAsk(toolCall.Function.Name, args, decision) {
+					output = e.executeTool(toolCall, args)
 				} else {
-					if e.permissionMgr.AskUser(toolCall.Function.Name, args) {
-						output = e.executeTool(toolCall, args)
-					} else {
-						output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
-						fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
-					}
+					output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
+					fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
 				}
 			} else {
 				output = e.executeTool(toolCall, args)

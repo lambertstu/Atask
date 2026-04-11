@@ -11,17 +11,33 @@ import (
 
 const TrustMarker = ".claude/.claude_trusted"
 
-var Modes = []string{"default", "plan", "auto"}
+var Modes = []string{"plan", "build"}
 
 var ReadOnlyTools = map[string]bool{
-	"read_file":     true,
-	"bash_readonly": true,
+	"read_file":        true,
+	"task_list":        true,
+	"task_get":         true,
+	"check_background": true,
+	"cron_list":        true,
+	"load_skill":       true,
+	"compact":          true,
+}
+
+var SystemTools = map[string]bool{
+	"todo":        true,
+	"task_create": true,
+	"task_update": true,
+	"task":        true,
+	"save_memory": true,
 }
 
 var WriteTools = map[string]bool{
-	"write_file": true,
-	"edit_file":  true,
-	"bash":       true,
+	"write_file":     true,
+	"edit_file":      true,
+	"bash":           true,
+	"background_run": true,
+	"cron_create":    true,
+	"cron_delete":    true,
 }
 
 type BashValidator struct {
@@ -96,11 +112,12 @@ type PermissionManager struct {
 	consecutiveDenials    int
 	maxConsecutiveDenials int
 	bashValidator         *BashValidator
+	checkerChain          PermissionChecker
 }
 
 func NewPermissionManager(mode string, workDir string) *PermissionManager {
 	if !utils.Contains(Modes, mode) {
-		mode = "default"
+		mode = "plan"
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)
@@ -108,7 +125,7 @@ func NewPermissionManager(mode string, workDir string) *PermissionManager {
 		absWorkDir = workDir
 	}
 
-	return &PermissionManager{
+	pm := &PermissionManager{
 		mode:    mode,
 		workDir: absWorkDir,
 		rules: []PermissionRule{
@@ -121,92 +138,27 @@ func NewPermissionManager(mode string, workDir string) *PermissionManager {
 		maxConsecutiveDenials: 3,
 		bashValidator:         NewBashValidator(),
 	}
+
+	pathChecker := &PathSecurityChecker{}
+	denyChecker := &DenyRulesChecker{}
+	bashChecker := &BashSecurityChecker{}
+	allowChecker := &AllowRulesChecker{}
+	modeChecker := &GlobalModeChecker{}
+	fallbackChecker := &FallbackChecker{}
+
+	pathChecker.SetNext(denyChecker).
+		SetNext(bashChecker).
+		SetNext(allowChecker).
+		SetNext(modeChecker).
+		SetNext(fallbackChecker)
+
+	pm.checkerChain = pathChecker
+
+	return pm
 }
 
 func (p *PermissionManager) Check(toolName string, toolInput map[string]interface{}) map[string]interface{} {
-	path := utils.GetStringFromMap(toolInput, "path")
-	if path != "" && !p.isPathAllowed(path) {
-		return map[string]interface{}{
-			"behavior":        "ask",
-			"reason":          fmt.Sprintf("Path outside workspace: %s. Grant access?", path),
-			"needs_path_auth": true,
-			"requested_path":  path,
-		}
-	}
-
-	for _, rule := range p.rules {
-		if rule.Behavior != "allow" {
-			continue
-		}
-		if p.matchesRule(rule, toolName, toolInput) {
-			p.consecutiveDenials = 0
-			return map[string]interface{}{
-				"behavior": "allow",
-				"reason":   fmt.Sprintf("Matched allow rule: %+v", rule),
-			}
-		}
-	}
-
-	if toolName == "bash" {
-		command := utils.GetStringFromMap(toolInput, "command")
-		failures := p.bashValidator.Validate(command)
-		if len(failures) > 0 {
-			severe := map[string]bool{"sudo": true, "rm_rf": true}
-			for _, f := range failures {
-				if severe[f.Name] {
-					desc := p.bashValidator.DescribeFailures(command)
-					return map[string]interface{}{
-						"behavior": "deny",
-						"reason":   fmt.Sprintf("Bash validator: %s", desc),
-					}
-				}
-			}
-			desc := p.bashValidator.DescribeFailures(command)
-			return map[string]interface{}{
-				"behavior": "ask",
-				"reason":   fmt.Sprintf("Bash validator flagged: %s", desc),
-			}
-		}
-	}
-
-	for _, rule := range p.rules {
-		if rule.Behavior != "deny" {
-			continue
-		}
-		if p.matchesRule(rule, toolName, toolInput) {
-			return map[string]interface{}{
-				"behavior": "deny",
-				"reason":   fmt.Sprintf("Blocked by deny rule: %+v", rule),
-			}
-		}
-	}
-
-	if p.mode == "plan" {
-		if WriteTools[toolName] {
-			return map[string]interface{}{
-				"behavior": "deny",
-				"reason":   "Plan mode: write operations are blocked",
-			}
-		}
-		return map[string]interface{}{
-			"behavior": "allow",
-			"reason":   "Plan mode: read-only allowed",
-		}
-	}
-
-	if p.mode == "auto" {
-		if ReadOnlyTools[toolName] {
-			return map[string]interface{}{
-				"behavior": "allow",
-				"reason":   "Auto mode: read-only tool auto-approved",
-			}
-		}
-	}
-
-	return map[string]interface{}{
-		"behavior": "ask",
-		"reason":   fmt.Sprintf("No rule matched for %s, asking user", toolName),
-	}
+	return p.checkerChain.Check(p, toolName, toolInput)
 }
 
 func (p *PermissionManager) SetMode(mode string) {
@@ -216,11 +168,50 @@ func (p *PermissionManager) SetMode(mode string) {
 }
 
 func (p *PermissionManager) AskUser(toolName string, toolInput map[string]interface{}) bool {
+	fmt.Printf("\n\033[33m[SECURITY WARNING]\033[0m Agent wants to execute tool: \033[1m%s\033[0m\n", toolName)
+	fmt.Printf("Arguments: %v\n", toolInput)
+	fmt.Print("Do you want to allow this operation? (y/N): ")
+
+	var response string
+	fmt.Scanln(&response)
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response == "y" || response == "yes" {
+		p.consecutiveDenials = 0
+		return true
+	}
+
 	p.consecutiveDenials++
 	if p.consecutiveDenials >= p.maxConsecutiveDenials {
-		fmt.Printf("[%d consecutive denials -- consider switching to plan mode]\n", p.consecutiveDenials)
+		fmt.Printf("\n\033[31m[%d consecutive denials -- consider switching to plan mode]\033[0m\n", p.consecutiveDenials)
 	}
 	return false
+}
+
+func (p *PermissionManager) HandleAsk(toolName string, toolInput map[string]interface{}, decision map[string]interface{}) bool {
+	if decision["needs_path_auth"] == true {
+		requestedPath := decision["requested_path"].(string)
+		requestedDir := filepath.Dir(requestedPath)
+
+		fmt.Printf("\n\033[33m[PATH AUTH]\033[0m Grant access to directory: \033[1m%s\033[0m? (y/N): ", requestedDir)
+		var response string
+		fmt.Scanln(&response)
+
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response == "y" || response == "yes" {
+			p.AddAllowedDir(requestedDir)
+			p.consecutiveDenials = 0
+			return true
+		}
+
+		p.consecutiveDenials++
+		if p.consecutiveDenials >= p.maxConsecutiveDenials {
+			fmt.Printf("\n\033[31m[%d consecutive denials -- consider switching to plan mode]\033[0m\n", p.consecutiveDenials)
+		}
+		return false
+	}
+
+	return p.AskUser(toolName, toolInput)
 }
 
 func (p *PermissionManager) AddRule(rule PermissionRule) {

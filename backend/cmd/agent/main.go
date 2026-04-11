@@ -79,7 +79,7 @@ func main() {
 	registry.Register(engine.NewCompactTool())
 
 	// 7. 初始化权限和 Hook 管理
-	permissionMgr := security.NewPermissionManager("default", cfg.WorkDir)
+	permissionMgr := security.NewPermissionManager("plan", cfg.WorkDir)
 	hookMgr := events.NewHookManager(cfg.WorkDir, false)
 
 	// 8. 创建引擎组件
@@ -115,7 +115,7 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("\033[32m[Agent MVP Ready - Refactored Architecture]\033[0m")
-	fmt.Println("Commands: /mode <default|plan|auto>, /tasks, /cron, /memories, /prompt")
+	fmt.Println("Commands: /mode <plan|build>, /tasks, /cron, /memories, /prompt")
 
 	for {
 		fmt.Print("\033[36magent >> \033[0m")
@@ -132,7 +132,7 @@ func main() {
 		// 处理特殊命令
 		if strings.HasPrefix(query, "/mode ") {
 			mode := strings.TrimSpace(strings.TrimPrefix(query, "/mode "))
-			modes := []string{"default", "plan", "auto"}
+			modes := []string{"plan", "build"}
 			valid := false
 			for _, m := range modes {
 				if m == mode {
