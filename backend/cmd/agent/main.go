@@ -41,6 +41,7 @@ func main() {
 	registry.Register(builtin.NewReadFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewWriteFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewEditFileTool(cfg.WorkDir))
+	registry.Register(builtin.NewWebFetchTool())
 	registry.Register(planning.NewTodoTool())
 
 	// 6. 初始化子系统

@@ -21,6 +21,7 @@ var ReadOnlyTools = map[string]bool{
 	"cron_list":        true,
 	"load_skill":       true,
 	"compact":          true,
+	"webfetch":         true,
 }
 
 var SystemTools = map[string]bool{

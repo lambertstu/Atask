@@ -3,9 +3,16 @@ module agent-base
 go 1.23.4
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.41.2
 	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/andybalholm/cascadia v1.3.2 // indirect
+	golang.org/x/net v0.29.0 // indirect
 )
 
 require (
