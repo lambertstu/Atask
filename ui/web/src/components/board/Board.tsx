@@ -24,7 +24,7 @@ export const Board: React.FC = () => {
 
   useEffect(() => {
     loadSessions()
-    wsService.connect(`ws://${window.location.host}/api/ws`)
+    wsService.connect('ws://localhost:8080/api/ws')
     
     return () => {
       wsService.disconnect()
@@ -32,7 +32,7 @@ export const Board: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (sessions.length > 0) {
+    if (sessions && sessions.length > 0) {
       subscribeToSessions(sessions.map(s => s.id))
     }
   }, [sessions])
@@ -41,10 +41,11 @@ export const Board: React.FC = () => {
     try {
       setLoading(true)
       const data = await api.sessions.list()
-      setSessions(data)
+      setSessions(data || [])
     } catch (error) {
       message.error('Failed to load sessions')
       console.error('Failed to load sessions:', error)
+      setSessions([])
     } finally {
       setLoading(false)
     }
@@ -82,7 +83,7 @@ export const Board: React.FC = () => {
     <div className="flex-1 overflow-x-auto p-4">
       <div className="flex gap-4 h-full">
         {COLUMNS.map(column => {
-          const columnSessions = sessions.filter(s => s.status === column.key)
+          const columnSessions = (sessions || []).filter(s => s?.status === column.key)
           return (
             <Column
               key={column.key}

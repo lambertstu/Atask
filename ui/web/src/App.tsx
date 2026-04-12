@@ -10,12 +10,12 @@ const App: React.FC = () => {
   const setWsConnected = useSessionStore(state => state.setWsConnected)
 
   useEffect(() => {
-    wsService.connect(`ws://${window.location.host}/api/ws`)
+    wsService.connect('ws://localhost:8080/api/ws')
     
     const checkHealth = async () => {
       try {
-        await fetch('/api/health')
-        setWsConnected(true)
+        const response = await fetch('http://localhost:8080/health')
+        setWsConnected(response.ok)
       } catch {
         setWsConnected(false)
       }

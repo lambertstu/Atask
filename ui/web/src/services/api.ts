@@ -33,7 +33,7 @@ export const api = {
   },
   
   health: async () => {
-    const response = await axios.get<{ status: string }>(`${API_BASE}/health`)
+    const response = await axios.get<{ status: string }>('/health')
     return response.data
   },
 }
