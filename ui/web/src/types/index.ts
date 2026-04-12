@@ -13,6 +13,7 @@ export interface Session {
   created_at: number
   last_active: number
   description?: string
+  permission_request?: PermissionRequest
 }
 
 export interface WSEvent {
