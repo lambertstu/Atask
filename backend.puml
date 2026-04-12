@@ -1,0 +1,580 @@
+@startuml
+namespace builtin {
+    class BashTool << (S,Aquamarine) >> {
+        - workDir string
+        - timeout time.Duration
+        - maxOutput int
+        - dangerous []string
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class EditTool << (S,Aquamarine) >> {
+        - workDir string
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class ReadTool << (S,Aquamarine) >> {
+        - workDir string
+        - maxOutput int
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class WriteTool << (S,Aquamarine) >> {
+        - workDir string
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+}
+
+"tools.Tool" <|-- "builtin.BashTool"
+"tools.Tool" <|-- "builtin.EditTool"
+"tools.Tool" <|-- "builtin.ReadTool"
+"tools.Tool" <|-- "builtin.WriteTool"
+
+namespace config {
+    class Config << (S,Aquamarine) >> {
+        + Model string
+        + WorkDir string
+        + APIKey string
+        + BaseURL string
+        + Timeout int
+        + MaxTokens int
+        + ContextThreshold int
+        + BashTimeout int
+
+    }
+}
+
+
+namespace engine {
+    class AgentEngine << (S,Aquamarine) >> {
+        - client llm.LLMClient
+        - registry tools.ToolRegistry
+        - permissionMgr *security.PermissionManager
+        - hookMgr *events.HookManager
+        - promptBuilder PromptBuilder
+        - contextMgr ContextManager
+        - recoveryMgr RecoveryManager
+        - model string
+        - contextThreshold int
+
+        - executeTool(toolCall openai.ToolCall, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+
+        + Run(ctx context.Context, messages []openai.ChatCompletionMessage) ([]openai.ChatCompletionMessage, error)
+
+    }
+    class CompactTool << (S,Aquamarine) >> {
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    interface ContextManager  {
+        + MicroCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
+        + AutoCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
+        + EstimateTokens(messages []openai.ChatCompletionMessage) int
+
+    }
+    class ContextManagerImpl << (S,Aquamarine) >> {
+        - client llm.LLMClient
+        - model string
+        - workdir string
+        - threshold int
+
+        + EstimateTokens(messages []openai.ChatCompletionMessage) int
+        + MicroCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
+        + AutoCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
+
+    }
+    interface PromptBuilder  {
+        + Build() string
+
+    }
+    interface RecoveryManager  {
+        + CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error)
+
+    }
+    class RecoveryManagerImpl << (S,Aquamarine) >> {
+        - client llm.LLMClient
+        - model string
+        - contextMgr ContextManager
+        - promptBuilder PromptBuilder
+
+        + CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error)
+
+    }
+    class SystemPromptBuilder << (S,Aquamarine) >> {
+        - workdir string
+        - model string
+
+        - buildCore() string
+        - buildToolListing() string
+        - buildSkillListing() string
+        - buildMemorySection() string
+        - buildClaudeMD() string
+        - buildDynamicContext() string
+
+        + Build() string
+
+    }
+}
+
+"tools.Tool" <|-- "engine.CompactTool"
+"engine.ContextManager" <|-- "engine.ContextManagerImpl"
+"engine.RecoveryManager" <|-- "engine.RecoveryManagerImpl"
+"engine.PromptBuilder" <|-- "engine.SystemPromptBuilder"
+
+namespace events {
+    class HookConfig << (S,Aquamarine) >> {
+        + Hooks <font color=blue>map</font>[string][]HookDefinition
+
+    }
+    class HookDefinition << (S,Aquamarine) >> {
+        + Matcher string
+        + Command string
+
+    }
+    class HookManager << (S,Aquamarine) >> {
+        - hooks <font color=blue>map</font>[string][]HookDefinition
+        - workDir string
+        - sdkMode bool
+
+        + RunHooks(event string, context <font color=blue>map</font>[string]<font color=blue>interface</font>{}) HookResult
+
+    }
+    class HookResult << (S,Aquamarine) >> {
+        + Blocked bool
+        + BlockReason string
+        + Messages []string
+        + PermissionOverride string
+
+    }
+}
+
+
+namespace llm {
+    class DashScopeClient << (S,Aquamarine) >> {
+        - client *openai.Client
+        - model string
+
+        + CreateCompletion(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+        + GetModel() string
+
+    }
+    interface LLMClient  {
+        + CreateCompletion(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+
+    }
+}
+
+"llm.LLMClient" <|-- "llm.DashScopeClient"
+
+namespace memory {
+    class Memory << (S,Aquamarine) >> {
+        + Name string
+        + Description string
+        + Type string
+        + Content string
+        + File string
+
+    }
+    class MemoryManager << (S,Aquamarine) >> {
+        - memoryDir string
+        - memories <font color=blue>map</font>[string]Memory
+
+        - rebuildIndex() 
+
+        + LoadAll() 
+        + ListMemories() <font color=blue>map</font>[string]Memory
+        + LoadMemoryPrompt() string
+        + SaveMemory(name string, description string, memType string, content string) string
+
+    }
+    class SaveMemoryTool << (S,Aquamarine) >> {
+        - manager *MemoryManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+}
+
+"tools.Tool" <|-- "memory.SaveMemoryTool"
+
+namespace planning {
+    class TodoItem << (S,Aquamarine) >> {
+        + ID string
+        + Text string
+        + Status string
+
+    }
+    class TodoManager << (S,Aquamarine) >> {
+        - items []TodoItem
+
+        + Update(rawItems <font color=blue>interface</font>{}) (string, error)
+        + Render() string
+
+    }
+    class TodoTool << (S,Aquamarine) >> {
+        - manager *TodoManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+}
+
+"tools.Tool" <|-- "planning.TodoTool"
+
+namespace security {
+    class BashValidator << (S,Aquamarine) >> {
+        - rules []<font color=blue>struct</font>{string, *regexp.Regexp}
+
+        + Validate(command string) []<font color=blue>struct</font>{string, string}
+        + IsSafe(command string) bool
+        + DescribeFailures(command string) string
+
+    }
+    class PermissionManager << (S,Aquamarine) >> {
+        - mode string
+        - rules []PermissionRule
+        - allowedDirs []string
+        - consecutiveDenials int
+        - maxConsecutiveDenials int
+        - bashValidator *BashValidator
+
+        - matchesRule(rule PermissionRule, toolName string, toolInput <font color=blue>map</font>[string]<font color=blue>interface</font>{}) bool
+        - isPathAllowed(path string) bool
+
+        + Check(toolName string, toolInput <font color=blue>map</font>[string]<font color=blue>interface</font>{}) <font color=blue>map</font>[string]<font color=blue>interface</font>{}
+        + SetMode(mode string) 
+        + AskUser(toolName string, toolInput <font color=blue>map</font>[string]<font color=blue>interface</font>{}) bool
+        + AddRule(rule PermissionRule) 
+        + AddAllowedDir(dir string) 
+        + GetAllowedDirs() []string
+
+    }
+    class PermissionRule << (S,Aquamarine) >> {
+        + Tool string
+        + Path string
+        + Content string
+        + Behavior string
+
+    }
+}
+
+
+namespace skills {
+    class LoadSkillTool << (S,Aquamarine) >> {
+        - loader *SkillLoader
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class Skill << (S,Aquamarine) >> {
+        + Meta SkillMeta
+        + Body string
+        + Path string
+
+    }
+    class SkillLoader << (S,Aquamarine) >> {
+        - skillsDir string
+        - skills <font color=blue>map</font>[string]Skill
+
+        - parseFrontmatter(text string) (SkillMeta, string)
+
+        + LoadAll() 
+        + GetDescriptions() string
+        + GetContent(name string) string
+
+    }
+    class SkillMeta << (S,Aquamarine) >> {
+        + Name string
+        + Description string
+        + Tags string
+
+    }
+}
+
+"tools.Tool" <|-- "skills.LoadSkillTool"
+
+namespace subagent {
+    class SubagentRunner << (S,Aquamarine) >> {
+        - client llm.LLMClient
+        - registry tools.ToolRegistry
+        - workDir string
+        - model string
+        - maxTurns int
+
+        - getChildTools() []openai.Tool
+
+        + Run(ctx context.Context, prompt string, description string) string
+
+    }
+    class TaskTool << (S,Aquamarine) >> {
+        - runner *SubagentRunner
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+}
+
+"tools.Tool" <|-- "subagent.TaskTool"
+
+namespace tasks {
+    class BackgroundManager << (S,Aquamarine) >> {
+        - dir string
+        - workDir string
+        - tasks <font color=blue>map</font>[string]*BackgroundTask
+        - notificationQueue []BackgroundNotification
+        - mu sync.Mutex
+
+        - recordPath(taskID string) string
+        - outputPath(taskID string) string
+        - persistTask(taskID string) 
+        - preview(output string, limit int) string
+        - execute(taskID string, command string) 
+
+        + Run(command string) string
+        + Check(taskID string) string
+        + DrainNotifications() []BackgroundNotification
+        + DetectStalled() []string
+
+    }
+    class BackgroundNotification << (S,Aquamarine) >> {
+        + TaskID string
+        + Status string
+        + Command string
+        + Preview string
+        + OutputFile string
+
+    }
+    class BackgroundRunTool << (S,Aquamarine) >> {
+        - manager *BackgroundManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class BackgroundTask << (S,Aquamarine) >> {
+        + ID string
+        + Status string
+        + Result string
+        + Command string
+        + StartedAt float64
+        + FinishedAt float64
+        + ResultPreview string
+        + OutputFile string
+
+    }
+    class CheckBackgroundTool << (S,Aquamarine) >> {
+        - manager *BackgroundManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class CronCreateTool << (S,Aquamarine) >> {
+        - scheduler *CronScheduler
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class CronDeleteTool << (S,Aquamarine) >> {
+        - scheduler *CronScheduler
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class CronListTool << (S,Aquamarine) >> {
+        - scheduler *CronScheduler
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class CronScheduler << (S,Aquamarine) >> {
+        - workDir string
+        - tasks []ScheduledTask
+        - queue []string
+        - mu sync.Mutex
+        - stopEvent bool
+        - lastCheckMinute int
+
+        - checkLoop() 
+        - checkTasks(now time.Time) 
+        - loadDurable() 
+        - saveDurable() 
+
+        + Start() 
+        + Stop() 
+        + Create(cronExpr string, prompt string, recurring bool, durable bool) string
+        + Delete(taskID string) string
+        + ListTasks() string
+        + DrainNotifications() []string
+
+    }
+    class ScheduledTask << (S,Aquamarine) >> {
+        + ID string
+        + Cron string
+        + Prompt string
+        + Recurring bool
+        + Durable bool
+        + CreatedAt float64
+        + LastFired float64
+
+    }
+    class TaskCreateTool << (S,Aquamarine) >> {
+        - manager *TaskManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class TaskGetTool << (S,Aquamarine) >> {
+        - manager *TaskManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class TaskListTool << (S,Aquamarine) >> {
+        - manager *TaskManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    class TaskManager << (S,Aquamarine) >> {
+        - dir string
+        - nextID int
+
+        - maxID() int
+        - load(taskID int) (*TaskRecord, error)
+        - save(task *TaskRecord) 
+        - clearDependency(completedID int) 
+
+        + Create(subject string, description string) string
+        + Get(taskID int) string
+        + Update(taskID int, status string, owner string, addBlockedBy []int, addBlocks []int) string
+        + ListAll() string
+
+    }
+    class TaskRecord << (S,Aquamarine) >> {
+        + ID int
+        + Subject string
+        + Description string
+        + Status string
+        + BlockedBy []int
+        + Blocks []int
+        + Owner string
+
+    }
+    class TaskUpdateTool << (S,Aquamarine) >> {
+        - manager *TaskManager
+
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+}
+
+"tools.Tool" <|-- "tasks.BackgroundRunTool"
+"tools.Tool" <|-- "tasks.CheckBackgroundTool"
+"tools.Tool" <|-- "tasks.CronCreateTool"
+"tools.Tool" <|-- "tasks.CronDeleteTool"
+"tools.Tool" <|-- "tasks.CronListTool"
+"tools.Tool" <|-- "tasks.TaskCreateTool"
+"tools.Tool" <|-- "tasks.TaskGetTool"
+"tools.Tool" <|-- "tasks.TaskListTool"
+"tools.Tool" <|-- "tasks.TaskUpdateTool"
+
+namespace tools {
+    class DefaultRegistry << (S,Aquamarine) >> {
+        - tools <font color=blue>map</font>[string]Tool
+        - mu sync.RWMutex
+
+        + Register(tool Tool) 
+        + Get(name string) (Tool, bool)
+        + List() []Tool
+        + GetSchemas() []openai.Tool
+        + Execute(ctx context.Context, name string, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) (string, error)
+
+    }
+    interface Tool  {
+        + Name() string
+        + Description() string
+        + Execute(ctx context.Context, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) string
+        + Schema() openai.Tool
+
+    }
+    interface ToolRegistry  {
+        + Register(tool Tool) 
+        + Get(name string) (Tool, bool)
+        + List() []Tool
+        + GetSchemas() []openai.Tool
+        + Execute(ctx context.Context, name string, args <font color=blue>map</font>[string]<font color=blue>interface</font>{}) (string, error)
+
+    }
+}
+
+"tools.ToolRegistry" <|-- "tools.DefaultRegistry"
+
+namespace utils {
+    class PathEscapeError << (S,Aquamarine) >> {
+        + Path string
+
+        + Error() string
+
+    }
+}
+
+
+@enduml
