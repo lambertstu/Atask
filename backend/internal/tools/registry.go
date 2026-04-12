@@ -61,3 +61,14 @@ func (r *DefaultRegistry) Execute(ctx context.Context, name string, args map[str
 	}
 	return tool.Execute(ctx, args), nil
 }
+
+func (r *DefaultRegistry) Clone() *DefaultRegistry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	clone := NewDefaultRegistry()
+	for name, tool := range r.tools {
+		clone.tools[name] = tool
+	}
+	return clone
+}

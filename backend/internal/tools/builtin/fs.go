@@ -69,8 +69,13 @@ func (t *ReadTool) Execute(ctx context.Context, args map[string]interface{}) str
 
 	limit := utils.GetIntFromMap(args, "limit")
 
+	workDir := t.workDir
+	if sessionWorkDir, ok := args["_session_work_dir"].(string); ok && sessionWorkDir != "" {
+		workDir = sessionWorkDir
+	}
+
 	allowedDirs := utils.GetStringSliceFromMap(args, "allowed_dirs")
-	safe, err := utils.SafePath(t.workDir, allowedDirs, path)
+	safe, err := utils.SafePath(workDir, allowedDirs, path)
 	if err != nil {
 		if _, ok := err.(*utils.PathEscapeError); ok {
 			return fmt.Sprintf("PATH_AUTH_REQUIRED:%s", safe)
@@ -152,8 +157,13 @@ func (t *WriteTool) Execute(ctx context.Context, args map[string]interface{}) st
 		return "Error: path is required"
 	}
 
+	workDir := t.workDir
+	if sessionWorkDir, ok := args["_session_work_dir"].(string); ok && sessionWorkDir != "" {
+		workDir = sessionWorkDir
+	}
+
 	allowedDirs := utils.GetStringSliceFromMap(args, "allowed_dirs")
-	safe, err := utils.SafePath(t.workDir, allowedDirs, path)
+	safe, err := utils.SafePath(workDir, allowedDirs, path)
 	if err != nil {
 		if _, ok := err.(*utils.PathEscapeError); ok {
 			return fmt.Sprintf("PATH_AUTH_REQUIRED:%s", safe)
@@ -212,8 +222,13 @@ func (t *EditTool) Execute(ctx context.Context, args map[string]interface{}) str
 		return "Error: path is required"
 	}
 
+	workDir := t.workDir
+	if sessionWorkDir, ok := args["_session_work_dir"].(string); ok && sessionWorkDir != "" {
+		workDir = sessionWorkDir
+	}
+
 	allowedDirs := utils.GetStringSliceFromMap(args, "allowed_dirs")
-	safe, err := utils.SafePath(t.workDir, allowedDirs, path)
+	safe, err := utils.SafePath(workDir, allowedDirs, path)
 	if err != nil {
 		if _, ok := err.(*utils.PathEscapeError); ok {
 			return fmt.Sprintf("PATH_AUTH_REQUIRED:%s", safe)

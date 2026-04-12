@@ -50,11 +50,16 @@ func (t *BashTool) Execute(ctx context.Context, args map[string]interface{}) str
 		}
 	}
 
+	workDir := t.workDir
+	if sessionWorkDir, ok := args["_session_work_dir"].(string); ok && sessionWorkDir != "" {
+		workDir = sessionWorkDir
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
-	cmd.Dir = t.workDir
+	cmd.Dir = workDir
 
 	output, err := cmd.CombinedOutput()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {

@@ -24,6 +24,10 @@ type RecoveryManager interface {
 	CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error)
 }
 
+type PermissionHandler func(requestID, toolName string, reason string) bool
+
+type EventPublisher func(eventType string, data map[string]interface{})
+
 type AgentEngine struct {
 	client           llm.LLMClient
 	registry         tools.ToolRegistry
@@ -34,6 +38,10 @@ type AgentEngine struct {
 	recoveryMgr      RecoveryManager
 	model            string
 	contextThreshold int
+	sessionID        string
+	workDir          string
+	permHandler      PermissionHandler
+	eventPublisher   EventPublisher
 }
 
 func NewAgentEngine(
@@ -58,6 +66,13 @@ func NewAgentEngine(
 		model:            model,
 		contextThreshold: contextThreshold,
 	}
+}
+
+func (e *AgentEngine) SetSessionInfo(sessionID, workDir string, permHandler PermissionHandler, eventPublisher EventPublisher) {
+	e.sessionID = sessionID
+	e.workDir = workDir
+	e.permHandler = permHandler
+	e.eventPublisher = eventPublisher
 }
 
 type CompactTool struct{}

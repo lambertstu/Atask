@@ -5,23 +5,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
+	"time"
 
 	"agent-base/internal/config"
-	"agent-base/internal/engine"
 	"agent-base/internal/llm"
-	"agent-base/internal/systems/memory"
-	"agent-base/internal/systems/skills"
-	"agent-base/internal/systems/subagent"
-	"agent-base/internal/systems/tasks"
+	"agent-base/internal/session"
 	"agent-base/internal/tools"
 	"agent-base/internal/tools/builtin"
-	"agent-base/internal/tools/planning"
-	"agent-base/pkg/events"
-	"agent-base/pkg/security"
-
-	"github.com/sashabaranov/go-openai"
 )
 
 func main() {
@@ -35,91 +26,37 @@ func main() {
 
 	llmClient := llm.NewClient(cfg)
 
-	registry := tools.NewDefaultRegistry()
+	globalRegistry := tools.NewDefaultRegistry()
+	globalRegistry.Register(builtin.NewBashTool(cfg.WorkDir, cfg.BashTimeout))
+	globalRegistry.Register(builtin.NewReadFileTool(cfg.WorkDir))
+	globalRegistry.Register(builtin.NewWriteFileTool(cfg.WorkDir))
+	globalRegistry.Register(builtin.NewEditFileTool(cfg.WorkDir))
+	globalRegistry.Register(builtin.NewWebFetchTool())
 
-	registry.Register(builtin.NewBashTool(cfg.WorkDir, cfg.BashTimeout))
-	registry.Register(builtin.NewReadFileTool(cfg.WorkDir))
-	registry.Register(builtin.NewWriteFileTool(cfg.WorkDir))
-	registry.Register(builtin.NewEditFileTool(cfg.WorkDir))
-	registry.Register(builtin.NewWebFetchTool())
-	registry.Register(planning.NewTodoTool())
+	sessionMgr := session.NewSessionManager(cfg, llmClient, globalRegistry)
 
-	// 6. 初始化子系统
-	memoryMgr := memory.NewMemoryManager(filepath.Join(cfg.WorkDir, ".memory"))
-	memoryMgr.LoadAll()
+	sessionMgr.RestoreSessions(cfg.WorkDir)
 
-	tasksDir := filepath.Join(cfg.WorkDir, ".tasks")
-	taskMgr := tasks.NewTaskManager(tasksDir)
-	backgroundMgr := tasks.NewBackgroundManager(filepath.Join(cfg.WorkDir, ".runtime-tasks"))
-	cronScheduler := tasks.NewCronScheduler()
+	defaultSession, err := sessionMgr.NewSession(cfg.WorkDir, "default")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating default session: %v\n", err)
+		os.Exit(1)
+	}
+	currentSessionID := defaultSession.ID
 
-	// 注册任务相关工具
-	registry.Register(tasks.NewTaskCreateTool(taskMgr))
-	registry.Register(tasks.NewTaskUpdateTool(taskMgr))
-	registry.Register(tasks.NewTaskListTool(taskMgr))
-	registry.Register(tasks.NewTaskGetTool(taskMgr))
-	registry.Register(tasks.NewBackgroundRunTool(backgroundMgr))
-	registry.Register(tasks.NewCheckBackgroundTool(backgroundMgr))
-	registry.Register(tasks.NewCronCreateTool(cronScheduler))
-	registry.Register(tasks.NewCronDeleteTool(cronScheduler))
-	registry.Register(tasks.NewCronListTool(cronScheduler))
+	go func() {
+		for {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 
-	// 注册 Memory 工具
-	registry.Register(memory.NewSaveMemoryTool(memoryMgr))
+	fmt.Println("\033[32m[Agent Ready - Session Management Enabled]\033[0m")
+	fmt.Println("Commands: /new <name>, /sessions, /switch <id>, /send <id> <msg>, /start <id>, /pause <id>, /cancel <id>")
 
-	// 注册 Skills 工具
-	skillLoader := skills.NewSkillLoader(filepath.Join(cfg.WorkDir, "skills"))
-	skillLoader.LoadAll()
-	registry.Register(skills.NewLoadSkillTool(skillLoader))
-
-	// 注册 Subagent 工具
-	subagentRunner := subagent.NewSubagentRunner(llmClient, registry, cfg.WorkDir, cfg.Model)
-	registry.Register(subagent.NewTaskTool(subagentRunner))
-
-	// 注册 Compact 工具
-	registry.Register(engine.NewCompactTool())
-
-	// 7. 初始化权限和 Hook 管理
-	permissionMgr := security.NewPermissionManager("plan", cfg.WorkDir)
-	hookMgr := events.NewHookManager(cfg.WorkDir, false)
-
-	// 8. 创建引擎组件
-	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.Model)
-	contextMgr := engine.NewContextManager(llmClient, cfg.Model, cfg.WorkDir, cfg.ContextThreshold)
-	recoveryMgr := engine.NewRecoveryManager(llmClient, cfg.Model, contextMgr, promptBuilder)
-
-	// 9. 组装 Agent 引擎
-	agentEngine := engine.NewAgentEngine(
-		llmClient,
-		registry,
-		permissionMgr,
-		hookMgr,
-		promptBuilder,
-		contextMgr,
-		recoveryMgr,
-		cfg.Model,
-		cfg.ContextThreshold,
-	)
-
-	// 10. 启动 Cron 调度器
-	cronScheduler.Start()
-	defer cronScheduler.Stop()
-
-	// 11. 触发 SessionStart Hook
-	hookMgr.RunHooks("SessionStart", map[string]interface{}{
-		"tool_name":  "",
-		"tool_input": map[string]interface{}{},
-	})
-
-	// 12. 启动 REPL
-	var history []openai.ChatCompletionMessage
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\033[32m[Agent MVP Ready - Refactored Architecture]\033[0m")
-	fmt.Println("Commands: /mode <plan|build>, /tasks, /cron, /memories, /prompt")
-
 	for {
-		fmt.Print("\033[36magent >> \033[0m")
+		fmt.Printf("\033[36magent [%s] >> \033[0m", currentSessionID)
 		query, err := reader.ReadString('\n')
 		if err != nil {
 			break
@@ -130,97 +67,217 @@ func main() {
 			break
 		}
 
-		// 处理特殊命令
-		if strings.HasPrefix(query, "/mode ") {
-			mode := strings.TrimSpace(strings.TrimPrefix(query, "/mode "))
-			modes := []string{"plan", "build"}
-			valid := false
-			for _, m := range modes {
-				if m == mode {
-					valid = true
-					break
-				}
-			}
-			if valid {
-				permissionMgr.SetMode(mode)
-				fmt.Printf("[Switched to %s mode]\n", mode)
-			} else {
-				fmt.Printf("Usage: /mode <%s>\n", strings.Join(modes, "|"))
-			}
+		if handleSystemCommand(query, sessionMgr, &currentSessionID) {
 			continue
 		}
 
-		if query == "/tasks" {
-			fmt.Println(taskMgr.ListAll())
+		if strings.HasPrefix(query, "/") {
+			fmt.Println("Unknown command. Available commands: /new, /sessions, /switch, /send, /start, /pause, /cancel")
 			continue
 		}
 
-		if query == "/cron" {
-			fmt.Println(cronScheduler.ListTasks())
+		currentSession, ok := sessionMgr.GetSession(currentSessionID)
+		if !ok {
+			fmt.Printf("Error: session %s not found\n", currentSessionID)
 			continue
 		}
 
-		if query == "/memories" {
-			memories := memoryMgr.ListMemories()
-			if len(memories) > 0 {
-				for name, mem := range memories {
-					fmt.Printf("  [%s] %s: %s\n", mem.Type, name, mem.Description)
-				}
-			} else {
-				fmt.Println("  (no memories)")
-			}
+		if currentSession.GetStatus() == session.StatusHumanReview {
+			fmt.Println("Session is waiting for permission approval. Use /approve or /reject")
 			continue
 		}
 
-		if query == "/prompt" {
-			fmt.Println("--- System Prompt ---")
-			fmt.Println(promptBuilder.Build())
-			fmt.Println("--- End ---")
-			continue
-		}
+		eventCh := sessionMgr.Subscribe(currentSessionID)
+		defer sessionMgr.Unsubscribe(currentSessionID, eventCh)
 
-		// 执行 Agent 循环
-		// Drain background notifications
-		bgNotifs := backgroundMgr.DrainNotifications()
-		for _, notif := range bgNotifs {
-			fmt.Printf("[bg:%s] %s: %s\n", notif.TaskID, notif.Status, notif.Preview)
-			history = append(history, openai.ChatCompletionMessage{
-				Role:    openai.ChatMessageRoleUser,
-				Content: fmt.Sprintf("<background-results>\n[bg:%s] %s: %s (output_file=%s)\n</background-results>", notif.TaskID, notif.Status, notif.Preview, notif.OutputFile),
-			})
-		}
-
-		// Drain cron notifications
-		cronNotifs := cronScheduler.DrainNotifications()
-		for _, notif := range cronNotifs {
-			preview := notif
-			if len(preview) > 100 {
-				preview = preview[:100]
-			}
-			fmt.Printf("[Cron notification] %s\n", preview)
-			history = append(history, openai.ChatCompletionMessage{
-				Role:    openai.ChatMessageRoleUser,
-				Content: notif,
-			})
-		}
-
-		history = append(history, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: query,
-		})
-
-		history, err = agentEngine.Run(ctx, history)
+		err = sessionMgr.SendMessage(currentSessionID, query)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			continue
 		}
 
-		if len(history) > 0 {
-			lastMsg := history[len(history)-1]
-			if lastMsg.Role == openai.ChatMessageRoleAssistant && lastMsg.Content != "" {
-				fmt.Println(lastMsg.Content)
+		waitForResponse(ctx, eventCh)
+	}
+
+	sessionMgr.Shutdown()
+}
+
+func handleSystemCommand(query string, sessionMgr *session.SessionManager, currentSessionID *string) bool {
+	if strings.HasPrefix(query, "/new ") {
+		name := strings.TrimSpace(strings.TrimPrefix(query, "/new "))
+		if name == "" {
+			name = fmt.Sprintf("session_%d", time.Now().Unix())
+		}
+
+		cfg, _ := config.LoadConfig()
+		newSession, err := sessionMgr.NewSession(cfg.WorkDir, name)
+		if err != nil {
+			fmt.Printf("Error creating session: %v\n", err)
+			return true
+		}
+
+		*currentSessionID = newSession.ID
+		fmt.Printf("Created session: %s\n", newSession.GetInfo())
+		return true
+	}
+
+	if query == "/sessions" {
+		sessions := sessionMgr.ListSessions()
+		if len(sessions) == 0 {
+			fmt.Println("No sessions.")
+		} else {
+			for _, s := range sessions {
+				fmt.Println(s.String())
 			}
 		}
-		fmt.Println()
+		return true
+	}
+
+	if strings.HasPrefix(query, "/switch ") {
+		sessionID := strings.TrimSpace(strings.TrimPrefix(query, "/switch "))
+		if _, ok := sessionMgr.GetSession(sessionID); ok {
+			*currentSessionID = sessionID
+			fmt.Printf("Switched to session: %s\n", sessionID)
+		} else {
+			fmt.Printf("Session %s not found\n", sessionID)
+		}
+		return true
+	}
+
+	if strings.HasPrefix(query, "/send ") {
+		parts := strings.SplitN(strings.TrimPrefix(query, "/send "), " ", 3)
+		if len(parts) < 2 {
+			fmt.Println("Usage: /send <session_id> <message>")
+			return true
+		}
+
+		sessionID := parts[0]
+		message := parts[1]
+		if len(parts) > 2 {
+			message = parts[1] + " " + parts[2]
+		}
+
+		eventCh := sessionMgr.Subscribe(sessionID)
+		defer sessionMgr.Unsubscribe(sessionID, eventCh)
+
+		err := sessionMgr.SendMessage(sessionID, message)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return true
+		}
+
+		waitForResponse(context.Background(), eventCh)
+		return true
+	}
+
+	if strings.HasPrefix(query, "/start ") {
+		sessionID := strings.TrimSpace(strings.TrimPrefix(query, "/start "))
+		err := sessionMgr.SendControl(sessionID, "start")
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Printf("Started session: %s\n", sessionID)
+		}
+		return true
+	}
+
+	if strings.HasPrefix(query, "/pause ") {
+		sessionID := strings.TrimSpace(strings.TrimPrefix(query, "/pause "))
+		err := sessionMgr.SendControl(sessionID, "pause")
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Printf("Paused session: %s\n", sessionID)
+		}
+		return true
+	}
+
+	if strings.HasPrefix(query, "/cancel ") {
+		sessionID := strings.TrimSpace(strings.TrimPrefix(query, "/cancel "))
+		err := sessionMgr.StopSession(sessionID)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Printf("Cancelled session: %s\n", sessionID)
+		}
+		return true
+	}
+
+	if strings.HasPrefix(query, "/approve ") {
+		parts := strings.Split(strings.TrimPrefix(query, "/approve "), " ")
+		if len(parts) < 2 {
+			fmt.Println("Usage: /approve <session_id> <request_id>")
+			return true
+		}
+		sessionID := parts[0]
+		requestID := parts[1]
+		err := sessionMgr.SendPermissionResponse(sessionID, requestID, true)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Printf("Approved permission request %s in session %s\n", requestID, sessionID)
+		}
+		return true
+	}
+
+	if strings.HasPrefix(query, "/reject ") {
+		parts := strings.Split(strings.TrimPrefix(query, "/reject "), " ")
+		if len(parts) < 2 {
+			fmt.Println("Usage: /reject <session_id> <request_id>")
+			return true
+		}
+		sessionID := parts[0]
+		requestID := parts[1]
+		err := sessionMgr.SendPermissionResponse(sessionID, requestID, false)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			fmt.Printf("Rejected permission request %s in session %s\n", requestID, sessionID)
+		}
+		return true
+	}
+
+	return false
+}
+
+func waitForResponse(ctx context.Context, eventCh chan session.SessionEvent) {
+	for {
+		select {
+		case event := <-eventCh:
+			switch event.Type {
+			case session.EventStatusChange:
+				from, _ := event.Data["from"].(string)
+				to, _ := event.Data["to"].(string)
+				fmt.Printf("\033[34m[Status: %s -> %s]\033[0m\n", from, to)
+				if to == "completed" {
+					return
+				}
+			case session.EventOutput:
+				content, _ := event.Data["content"].(string)
+				isFinal, _ := event.Data["is_final"].(bool)
+				fmt.Println(content)
+				if isFinal {
+					return
+				}
+			case session.EventToolCall:
+				toolName, _ := event.Data["tool_name"].(string)
+				fmt.Printf("\033[33m[Tool: %s]\033[0m\n", toolName)
+			case session.EventPermission:
+				requestID, _ := event.Data["request_id"].(string)
+				toolName, _ := event.Data["tool_name"].(string)
+				reason, _ := event.Data["reason"].(string)
+				fmt.Printf("\033[31m[Permission Request %s] Tool: %s, Reason: %s\033[0m\n", requestID, toolName, reason)
+				fmt.Println("Use /approve or /reject <session_id> <request_id> to respond")
+			case session.EventError:
+				errMsg, _ := event.Data["error"].(string)
+				fmt.Printf("\033[31m[Error: %s]\033[0m\n", errMsg)
+				return
+			}
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Minute):
+			fmt.Println("[Timeout waiting for response]")
+			return
+		}
 	}
 }

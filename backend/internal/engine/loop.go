@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"agent-base/pkg/utils"
 
@@ -16,7 +17,6 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 	roundsSinceTodo := 0
 
 	for {
-		// Micro compact
 		messages = e.contextMgr.MicroCompact(messages)
 
 		if e.contextMgr.EstimateTokens(messages) > e.contextThreshold {
@@ -62,6 +62,13 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 				continue
 			}
 
+			if e.eventPublisher != nil {
+				e.eventPublisher("tool_call", map[string]interface{}{
+					"tool_name": toolCall.Function.Name,
+					"args":      args,
+				})
+			}
+
 			decision := e.permissionMgr.Check(toolCall.Function.Name, args)
 			var output string
 
@@ -69,11 +76,33 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 				output = fmt.Sprintf("Permission denied: %s", decision["reason"])
 				fmt.Printf("\033[31m[DENIED] %s: %s\033[0m\n", toolCall.Function.Name, decision["reason"])
 			} else if decision["behavior"] == "ask" {
-				if e.permissionMgr.HandleAsk(toolCall.Function.Name, args, decision) {
-					output = e.executeTool(toolCall, args)
+				if e.permHandler != nil {
+					requestID := fmt.Sprintf("perm_%d", time.Now().UnixNano()/1000000)
+					reasonStr, _ := decision["reason"].(string)
+
+					if e.eventPublisher != nil {
+						e.eventPublisher("permission_request", map[string]interface{}{
+							"request_id": requestID,
+							"tool_name":  toolCall.Function.Name,
+							"tool_input": args,
+							"reason":     reasonStr,
+						})
+					}
+
+					approved := e.permHandler(requestID, toolCall.Function.Name, reasonStr)
+					if approved {
+						output = e.executeTool(toolCall, args)
+					} else {
+						output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
+						fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
+					}
 				} else {
-					output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
-					fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
+					if e.permissionMgr.HandleAsk(toolCall.Function.Name, args, decision) {
+						output = e.executeTool(toolCall, args)
+					} else {
+						output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
+						fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
+					}
 				}
 			} else {
 				output = e.executeTool(toolCall, args)
@@ -119,8 +148,11 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 func (e *AgentEngine) executeTool(toolCall openai.ToolCall, args map[string]interface{}) string {
 	ctx := context.Background()
 
-	// 注入 allowedDirs 到 args（用于文件工具的路径检查）
 	args["allowed_dirs"] = e.permissionMgr.GetAllowedDirs()
+
+	if e.workDir != "" {
+		args["_session_work_dir"] = e.workDir
+	}
 
 	hookCtx := map[string]interface{}{
 		"tool_name":  toolCall.Function.Name,
