@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -51,45 +52,110 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 		usedTodoThisRound := false
 		manualCompactRequested := false
 
-		for _, toolCall := range assistantMessage.ToolCalls {
+		var wg sync.WaitGroup
+		var printMu sync.Mutex
+		results := make([]string, len(assistantMessage.ToolCalls))
+		errResults := make([]error, len(assistantMessage.ToolCalls))
+
+		// 所有工具都在主线程进行权限检查和交互询问（避免并发访问 permissionMgr 和终端错乱）
+		type preparedTool struct {
+			execFunc func() string
+		}
+		preparedTools := make([]preparedTool, len(assistantMessage.ToolCalls))
+
+		for i, tc := range assistantMessage.ToolCalls {
+			index := i
+			toolCall := tc
+
 			var args map[string]interface{}
 			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-				messages = append(messages, openai.ChatCompletionMessage{
-					Role:       openai.ChatMessageRoleTool,
-					ToolCallID: toolCall.ID,
-					Content:    fmt.Sprintf("Error: %v", err),
-				})
+				errResults[index] = err
 				continue
 			}
 
 			decision := e.permissionMgr.Check(toolCall.Function.Name, args)
-			var output string
 
+			var execFunc func() string
 			if decision["behavior"] == "deny" {
-				output = fmt.Sprintf("Permission denied: %s", decision["reason"])
-				fmt.Printf("\033[31m[DENIED] %s: %s\033[0m\n", toolCall.Function.Name, decision["reason"])
+				reason := decision["reason"]
+				execFunc = func() string {
+					printMu.Lock()
+					defer printMu.Unlock()
+					fmt.Printf("\033[31m[DENIED] %s: %s\033[0m\n", toolCall.Function.Name, reason)
+					return fmt.Sprintf("Permission denied: %s", reason)
+				}
 			} else if decision["behavior"] == "ask" {
 				if e.permissionMgr.HandleAsk(toolCall.Function.Name, args, decision) {
-					output = e.executeTool(toolCall, args)
+					execFunc = func() string {
+						return e.executeTool(toolCall, args)
+					}
 				} else {
-					output = fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
-					fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
+					execFunc = func() string {
+						printMu.Lock()
+						defer printMu.Unlock()
+						fmt.Printf("\033[31m[USER DENIED] %s\033[0m\n", toolCall.Function.Name)
+						return fmt.Sprintf("Permission denied by user for %s", toolCall.Function.Name)
+					}
 				}
 			} else {
-				output = e.executeTool(toolCall, args)
+				execFunc = func() string {
+					return e.executeTool(toolCall, args)
+				}
 			}
 
-			fmt.Printf("\033[33m> %s %s:\033[0m\n", toolCall.Function.Name, toolCall.Function.Arguments)
-			if len(output) > 200 {
-				fmt.Println(output[:200])
+			preparedTools[index] = preparedTool{execFunc: execFunc}
+		}
+
+		// 只有 task 工具放入协程异步执行，其它工具仍在主线程同步执行
+		for i, tc := range assistantMessage.ToolCalls {
+			index := i
+			toolCall := tc
+			prep := preparedTools[index]
+
+			if errResults[index] != nil {
+				continue
+			}
+
+			runTool := func(idx int, call openai.ToolCall, fn func() string) {
+				output := fn()
+
+				printMu.Lock()
+				fmt.Printf("\033[33m> %s %s:\033[0m\n", call.Function.Name, call.Function.Arguments)
+				if len(output) > 200 {
+					fmt.Println(output[:200])
+				} else {
+					fmt.Println(output)
+				}
+				printMu.Unlock()
+
+				results[idx] = output
+			}
+
+			if toolCall.Function.Name == "task" {
+				wg.Add(1)
+				go func(idx int, call openai.ToolCall, fn func() string) {
+					defer wg.Done()
+					runTool(idx, call, fn)
+				}(index, toolCall, prep.execFunc)
 			} else {
-				fmt.Println(output)
+				runTool(index, toolCall, prep.execFunc)
+			}
+		}
+
+		wg.Wait()
+
+		for i, toolCall := range assistantMessage.ToolCalls {
+			var finalOutput string
+			if errResults[i] != nil {
+				finalOutput = fmt.Sprintf("Error: %v", errResults[i])
+			} else {
+				finalOutput = results[i]
 			}
 
 			messages = append(messages, openai.ChatCompletionMessage{
 				Role:       openai.ChatMessageRoleTool,
 				ToolCallID: toolCall.ID,
-				Content:    output,
+				Content:    finalOutput,
 			})
 
 			if toolCall.Function.Name == "todo" {
