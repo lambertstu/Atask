@@ -7,6 +7,7 @@ import (
 	"agent-base/internal/tools"
 	"agent-base/pkg/events"
 	"agent-base/pkg/security"
+
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -18,6 +19,7 @@ type ContextManager interface {
 	MicroCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
 	AutoCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
 	EstimateTokens(messages []openai.ChatCompletionMessage) int
+	SaveLargeOutput(toolName, output string) string
 }
 
 type RecoveryManager interface {

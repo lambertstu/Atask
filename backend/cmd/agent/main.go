@@ -113,12 +113,21 @@ func main() {
 		"tool_input": map[string]interface{}{},
 	})
 
+	cmdProcessor := &CommandProcessor{
+		permissionMgr: permissionMgr,
+		taskMgr:       taskMgr,
+		cronScheduler: cronScheduler,
+		memoryMgr:     memoryMgr,
+		promptBuilder: promptBuilder,
+		contextMgr:    contextMgr,
+	}
+
 	// 12. 启动 REPL
 	var history []openai.ChatCompletionMessage
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("\033[32m[Agent MVP Ready - Refactored Architecture]\033[0m")
-	fmt.Println("Commands: /mode <plan|build>, /tasks, /cron, /memories, /prompt")
+	fmt.Println("Commands: /mode <plan|build>, /tasks, /cron, /memories, /prompt, /compact")
 
 	for {
 		fmt.Print("\033[36magent >> \033[0m")
@@ -133,51 +142,9 @@ func main() {
 		}
 
 		// 处理特殊命令
-		if strings.HasPrefix(query, "/mode ") {
-			mode := strings.TrimSpace(strings.TrimPrefix(query, "/mode "))
-			modes := []string{"plan", "build"}
-			valid := false
-			for _, m := range modes {
-				if m == mode {
-					valid = true
-					break
-				}
-			}
-			if valid {
-				permissionMgr.SetMode(mode)
-				fmt.Printf("[Switched to %s mode]\n", mode)
-			} else {
-				fmt.Printf("Usage: /mode <%s>\n", strings.Join(modes, "|"))
-			}
-			continue
-		}
-
-		if query == "/tasks" {
-			fmt.Println(taskMgr.ListAll())
-			continue
-		}
-
-		if query == "/cron" {
-			fmt.Println(cronScheduler.ListTasks())
-			continue
-		}
-
-		if query == "/memories" {
-			memories := memoryMgr.ListMemories()
-			if len(memories) > 0 {
-				for name, mem := range memories {
-					fmt.Printf("  [%s] %s: %s\n", mem.Type, name, mem.Description)
-				}
-			} else {
-				fmt.Println("  (no memories)")
-			}
-			continue
-		}
-
-		if query == "/prompt" {
-			fmt.Println("--- System Prompt ---")
-			fmt.Println(promptBuilder.Build())
-			fmt.Println("--- End ---")
+		isCmd, newHistory := cmdProcessor.Handle(query, history)
+		history = newHistory
+		if isCmd {
 			continue
 		}
 

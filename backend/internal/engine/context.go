@@ -144,3 +144,24 @@ func (cm *ContextManagerImpl) AutoCompact(messages []openai.ChatCompletionMessag
 		},
 	}
 }
+
+func (cm *ContextManagerImpl) SaveLargeOutput(toolName, output string) string {
+	if len(output) <= 4000 {
+		return output
+	}
+
+	transcriptDir := filepath.Join(cm.workdir, TRANSCRIPT_DIR)
+	os.MkdirAll(transcriptDir, 0755)
+
+	filename := fmt.Sprintf("output_%s_%d.txt", toolName, time.Now().UnixNano())
+	filePath := filepath.Join(transcriptDir, filename)
+
+	err := os.WriteFile(filePath, []byte(output), 0644)
+	if err != nil {
+		return fmt.Sprintf("[Output too large (%d bytes), failed to save: %v]\n\nPreview:\n%s...\n[End of preview]",
+			len(output), err, utils.Truncate(output, 4000))
+	}
+
+	return fmt.Sprintf("[Output too large (%d bytes), saved to %s]\n\nPreview:\n%s...\n[End of preview]",
+		len(output), filePath, utils.Truncate(output, 4000))
+}

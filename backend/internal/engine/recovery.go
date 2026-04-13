@@ -49,12 +49,19 @@ func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req opena
 	maxOutputRecoveryCount := 0
 
 	for {
-		rm.contextMgr.MicroCompact(*messages)
+		*messages = rm.contextMgr.MicroCompact(*messages)
 
 		if rm.contextMgr.EstimateTokens(*messages) > CONTEXT_THRESHOLD {
 			fmt.Println("[auto_compact triggered]")
 			*messages = rm.contextMgr.AutoCompact(*messages)
 		}
+
+		req.Messages = append([]openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: rm.promptBuilder.Build(),
+			},
+		}, *messages...)
 
 		var resp openai.ChatCompletionResponse
 		var lastErr error

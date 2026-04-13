@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"agent-base/pkg/utils"
-
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -51,6 +49,8 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 		}
 
 		usedTodoThisRound := false
+		manualCompactRequested := false
+
 		for _, toolCall := range assistantMessage.ToolCalls {
 			var args map[string]interface{}
 			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
@@ -97,9 +97,13 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 			}
 
 			if toolCall.Function.Name == "compact" {
-				fmt.Println("[manual compact]")
-				messages = e.contextMgr.AutoCompact(messages)
+				manualCompactRequested = true
 			}
+		}
+
+		if manualCompactRequested {
+			fmt.Println("[manual compact triggered]")
+			messages = e.contextMgr.AutoCompact(messages)
 		}
 
 		roundsSinceTodo++
@@ -146,9 +150,5 @@ func (e *AgentEngine) executeTool(toolCall openai.ToolCall, args map[string]inte
 		}
 	}
 
-	if len(output) > 50000 {
-		output = utils.Truncate(output, 50000)
-	}
-
-	return output
+	return e.contextMgr.SaveLargeOutput(toolCall.Function.Name, output)
 }
