@@ -10,6 +10,7 @@
 *.jsonl
 *.log
 *.exp
+*.txt
 
 # IDEs
 .idea/
