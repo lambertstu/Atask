@@ -113,13 +113,13 @@ func main() {
 		"tool_input": map[string]interface{}{},
 	})
 
-	cmdProcessor := &CommandProcessor{
-		permissionMgr: permissionMgr,
-		taskMgr:       taskMgr,
-		cronScheduler: cronScheduler,
-		memoryMgr:     memoryMgr,
-		promptBuilder: promptBuilder,
-		contextMgr:    contextMgr,
+	cmdProcessor := &engine.CommandProcessor{
+		PermissionMgr: permissionMgr,
+		TaskMgr:       taskMgr,
+		CronScheduler: cronScheduler,
+		MemoryMgr:     memoryMgr,
+		PromptBuilder: promptBuilder,
+		ContextMgr:    contextMgr,
 	}
 
 	// 12. 启动 REPL

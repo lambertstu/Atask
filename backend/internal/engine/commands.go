@@ -1,10 +1,9 @@
-package main
+package engine
 
 import (
 	"fmt"
 	"strings"
 
-	"agent-base/internal/engine"
 	"agent-base/internal/systems/memory"
 	"agent-base/internal/systems/tasks"
 	"agent-base/pkg/security"
@@ -13,12 +12,12 @@ import (
 )
 
 type CommandProcessor struct {
-	permissionMgr *security.PermissionManager
-	taskMgr       *tasks.TaskManager
-	cronScheduler *tasks.CronScheduler
-	memoryMgr     *memory.MemoryManager
-	promptBuilder engine.PromptBuilder
-	contextMgr    engine.ContextManager
+	PermissionMgr *security.PermissionManager
+	TaskMgr       *tasks.TaskManager
+	CronScheduler *tasks.CronScheduler
+	MemoryMgr     *memory.MemoryManager
+	PromptBuilder PromptBuilder
+	ContextMgr    ContextManager
 }
 
 // Handle 处理输入的命令，返回 (是否是系统命令, 更新后的history)
@@ -38,7 +37,7 @@ func (cp *CommandProcessor) Handle(query string, history []openai.ChatCompletion
 			}
 		}
 		if valid {
-			cp.permissionMgr.SetMode(mode)
+			cp.PermissionMgr.SetMode(mode)
 			fmt.Printf("[Switched to %s mode]\n", mode)
 		} else {
 			fmt.Printf("Usage: /mode <%s>\n", strings.Join(modes, "|"))
@@ -47,17 +46,17 @@ func (cp *CommandProcessor) Handle(query string, history []openai.ChatCompletion
 	}
 
 	if query == "/tasks" {
-		fmt.Println(cp.taskMgr.ListAll())
+		fmt.Println(cp.TaskMgr.ListAll())
 		return true, history
 	}
 
 	if query == "/cron" {
-		fmt.Println(cp.cronScheduler.ListTasks())
+		fmt.Println(cp.CronScheduler.ListTasks())
 		return true, history
 	}
 
 	if query == "/memories" {
-		memories := cp.memoryMgr.ListMemories()
+		memories := cp.MemoryMgr.ListMemories()
 		if len(memories) > 0 {
 			for name, mem := range memories {
 				fmt.Printf("  [%s] %s: %s\n", mem.Type, name, mem.Description)
@@ -70,14 +69,14 @@ func (cp *CommandProcessor) Handle(query string, history []openai.ChatCompletion
 
 	if query == "/prompt" {
 		fmt.Println("--- System Prompt ---")
-		fmt.Println(cp.promptBuilder.Build())
+		fmt.Println(cp.PromptBuilder.Build())
 		fmt.Println("--- End ---")
 		return true, history
 	}
 
 	if query == "/compact" {
 		fmt.Println("[Manual compact requested by user...]")
-		history = cp.contextMgr.AutoCompact(history)
+		history = cp.ContextMgr.AutoCompact(history)
 		return true, history
 	}
 
