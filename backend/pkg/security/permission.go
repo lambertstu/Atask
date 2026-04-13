@@ -15,6 +15,8 @@ var Modes = []string{"plan", "build"}
 
 var ReadOnlyTools = map[string]bool{
 	"read_file":        true,
+	"search_files":     true,
+	"grep_code":        true,
 	"task_list":        true,
 	"task_get":         true,
 	"check_background": true,
@@ -54,7 +56,6 @@ func NewBashValidator() *BashValidator {
 		name    string
 		pattern *regexp.Regexp
 	}{
-		{"shell_metachar", regexp.MustCompile(`[;&|\` + "`" + `$]`)},
 		{"sudo", regexp.MustCompile(`\bsudo\b`)},
 		{"rm_rf", regexp.MustCompile(`\brm\s+(-[a-zA-Z]*)?r`)},
 		{"cmd_substitution", regexp.MustCompile(`\$\(`)},

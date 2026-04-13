@@ -60,6 +60,12 @@ func (l *SkillLoader) LoadAll() {
 			meta.Name = filepath.Base(filepath.Dir(path))
 		}
 
+		if existing, ok := l.skills[meta.Name]; ok {
+			fmt.Printf("\033[33m[Warning]\033[0m Skill name conflict detected: '%s'. Skipping %s (already loaded from %s)\n",
+				meta.Name, path, existing.Path)
+			return nil
+		}
+
 		l.skills[meta.Name] = Skill{
 			Meta: meta,
 			Body: body,

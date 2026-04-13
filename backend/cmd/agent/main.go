@@ -39,6 +39,8 @@ func main() {
 
 	registry.Register(builtin.NewBashTool(cfg.WorkDir, cfg.BashTimeout))
 	registry.Register(builtin.NewReadFileTool(cfg.WorkDir))
+	registry.Register(builtin.NewSearchFilesTool(cfg.WorkDir))
+	registry.Register(builtin.NewGrepCodeTool(cfg.WorkDir))
 	registry.Register(builtin.NewWriteFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewEditFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewWebFetchTool())

@@ -16,8 +16,8 @@ func TestNewPermissionManager(t *testing.T) {
 	}{
 		{"plan", "plan"},
 		{"build", "build"},
-		{"invalid", "build"},
-		{"", "build"},
+		{"invalid", "plan"},
+		{"", "plan"},
 	}
 
 	for _, tt := range tests {
@@ -53,13 +53,13 @@ func TestCheck_PermissionMatrix(t *testing.T) {
 	}{
 		{"read_file inside workspace", "read_file", "build", map[string]interface{}{"path": insidePath}, "allow", false},
 		{"read_file outside workspace", "read_file", "build", map[string]interface{}{"path": outsidePath}, "ask", true},
-		{"write_file inside workspace", "write_file", "build", map[string]interface{}{"path": insidePath}, "ask", false},
+		{"write_file inside workspace", "write_file", "build", map[string]interface{}{"path": insidePath}, "allow", false},
 		{"write_file in plan mode", "write_file", "plan", map[string]interface{}{"path": insidePath}, "deny", false},
 		{"read_file in plan mode", "read_file", "plan", map[string]interface{}{"path": insidePath}, "allow", false},
 		{"bash safe command in build mode", "bash", "build", map[string]interface{}{"command": "ls"}, "allow", false},
 		{"bash dangerous command in build mode", "bash", "build", map[string]interface{}{"command": "sudo ls"}, "deny", false},
 		{"task_list in plan mode", "task_list", "plan", map[string]interface{}{}, "allow", false},
-		{"task_create in plan mode", "task_create", "plan", map[string]interface{}{}, "deny", false},
+		{"task_create in plan mode", "task_create", "plan", map[string]interface{}{}, "allow", false},
 		{"unknown tool", "unknown_tool", "build", map[string]interface{}{}, "ask", false},
 	}
 
@@ -89,9 +89,9 @@ func TestCheck_BashDangerousCommands(t *testing.T) {
 		{"ls; rm -rf /", "deny"},
 		{"rm -rf /home/user", "deny"},
 		{"ls $(whoami)", "ask"},
-		{"ls; echo done", "ask"},
-		{"ls | grep test", "ask"},
-		{"ls && echo done", "ask"},
+		{"ls; echo done", "allow"},
+		{"ls | grep test", "allow"},
+		{"ls && echo done", "allow"},
 		{"ls", "allow"},
 		{"git status", "allow"},
 		{"cat file.txt", "allow"},

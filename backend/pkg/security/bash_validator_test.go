@@ -9,9 +9,9 @@ import (
 func TestNewBashValidator(t *testing.T) {
 	v := NewBashValidator()
 	assert.NotNil(t, v)
-	assert.Len(t, v.rules, 5)
+	assert.Len(t, v.rules, 4)
 
-	expectedRules := []string{"shell_metachar", "sudo", "rm_rf", "cmd_substitution", "ifs_injection"}
+	expectedRules := []string{"sudo", "rm_rf", "cmd_substitution", "ifs_injection"}
 	for i, expected := range expectedRules {
 		assert.Equal(t, expected, v.rules[i].name)
 	}
@@ -25,16 +25,16 @@ func TestBashValidator_Validate(t *testing.T) {
 		expected []string
 	}{
 		{"ls", nil},
-		{"ls; rm -rf /", []string{"shell_metachar", "rm_rf"}},
+		{"ls; rm -rf /", []string{"rm_rf"}},
 		{"sudo ls", []string{"sudo"}},
 		{"rm -rf /", []string{"rm_rf"}},
 		{"rm -rf --no-preserve-root /", []string{"rm_rf"}},
 		{"rm -rf /home/user", []string{"rm_rf"}},
-		{"ls $(whoami)", []string{"shell_metachar", "cmd_substitution"}},
-		{"ls | grep test", []string{"shell_metachar"}},
-		{"ls && echo done", []string{"shell_metachar"}},
-		{"ls || echo fail", []string{"shell_metachar"}},
-		{"echo `pwd`", []string{"shell_metachar"}},
+		{"ls $(whoami)", []string{"cmd_substitution"}},
+		{"ls | grep test", nil},
+		{"ls && echo done", nil},
+		{"ls || echo fail", nil},
+		{"echo `pwd`", nil},
 		{"IFS= read -r line", []string{"ifs_injection"}},
 		{"cat file", nil},
 		{"echo 'hello world'", nil},
@@ -67,10 +67,10 @@ func TestBashValidator_IsSafe(t *testing.T) {
 		{"npm install", true},
 		{"sudo ls", false},
 		{"rm -rf /", false},
-		{"ls; cat file", false},
+		{"ls; cat file", true},
 		{"ls $(pwd)", false},
 		{"IFS= read", false},
-		{"ls | grep test", false},
+		{"ls | grep test", true},
 	}
 
 	for _, tt := range tests {
@@ -102,27 +102,6 @@ func TestBashValidator_DescribeFailures(t *testing.T) {
 			} else {
 				assert.Equal(t, "No security issues detected", desc)
 			}
-		})
-	}
-}
-
-func TestBashValidator_ShellMetachar(t *testing.T) {
-	v := NewBashValidator()
-
-	metachars := []string{";", "|", "&", "`", "$"}
-	for _, char := range metachars {
-		t.Run("metachar_"+char, func(t *testing.T) {
-			command := "ls " + char + " echo test"
-			failures := v.Validate(command)
-			assert.True(t, len(failures) > 0)
-			found := false
-			for _, f := range failures {
-				if f.Name == "shell_metachar" {
-					found = true
-					break
-				}
-			}
-			assert.True(t, found, "Expected shell_metachar to be detected for '%s'", command)
 		})
 	}
 }
@@ -251,9 +230,9 @@ func TestBashValidator_ComplexCommands(t *testing.T) {
 		command  string
 		expected []string
 	}{
-		{"sudo rm -rf / && echo done", []string{"shell_metachar", "sudo", "rm_rf"}},
-		{"ls | grep test | wc -l", []string{"shell_metachar"}},
-		{"cat $(find . -type f) | grep pattern", []string{"shell_metachar", "cmd_substitution"}},
+		{"sudo rm -rf / && echo done", []string{"sudo", "rm_rf"}},
+		{"ls | grep test | wc -l", nil},
+		{"cat $(find . -type f) | grep pattern", []string{"cmd_substitution"}},
 	}
 
 	for _, tt := range tests {
