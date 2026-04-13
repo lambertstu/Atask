@@ -12,14 +12,16 @@ import (
 const DYNAMIC_BOUNDARY = "=== DYNAMIC_BOUNDARY ==="
 
 type SystemPromptBuilder struct {
-	workdir string
-	model   string
+	workdir    string
+	projectDir string
+	model      string
 }
 
-func NewSystemPromptBuilder(workdir, model string) *SystemPromptBuilder {
+func NewSystemPromptBuilder(workdir, projectDir, model string) *SystemPromptBuilder {
 	return &SystemPromptBuilder{
-		workdir: workdir,
-		model:   model,
+		workdir:    workdir,
+		projectDir: projectDir,
+		model:      model,
 	}
 }
 
@@ -64,7 +66,7 @@ func (b *SystemPromptBuilder) buildToolListing() string {
 }
 
 func (b *SystemPromptBuilder) buildSkillListing() string {
-	skillsDir := filepath.Join(b.workdir, "skills")
+	skillsDir := filepath.Join(b.projectDir, "skills")
 	if _, err := os.Stat(skillsDir); os.IsNotExist(err) {
 		return ""
 	}

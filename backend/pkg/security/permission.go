@@ -21,7 +21,6 @@ var ReadOnlyTools = map[string]bool{
 	"task_get":         true,
 	"check_background": true,
 	"cron_list":        true,
-	"load_skill":       true,
 	"compact":          true,
 	"webfetch":         true,
 }
@@ -32,6 +31,7 @@ var SystemTools = map[string]bool{
 	"task_update": true,
 	"task":        true,
 	"save_memory": true,
+	"load_skill":  true,
 }
 
 var WriteTools = map[string]bool{

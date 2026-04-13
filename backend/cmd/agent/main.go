@@ -70,7 +70,7 @@ func main() {
 	registry.Register(memory.NewSaveMemoryTool(memoryMgr))
 
 	// 注册 Skills 工具
-	skillLoader := skills.NewSkillLoader(filepath.Join(cfg.WorkDir, "skills"))
+	skillLoader := skills.NewSkillLoader(filepath.Join(cfg.ProjectRoot, "skills"))
 	skillLoader.LoadAll()
 	registry.Register(skills.NewLoadSkillTool(skillLoader))
 
@@ -86,7 +86,7 @@ func main() {
 	hookMgr := events.NewHookManager(cfg.WorkDir, false)
 
 	// 8. 创建引擎组件
-	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.Model)
+	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.ProjectRoot, cfg.Model)
 	contextMgr := engine.NewContextManager(llmClient, cfg.Model, cfg.WorkDir, cfg.ContextThreshold)
 	recoveryMgr := engine.NewRecoveryManager(llmClient, cfg.Model, contextMgr, promptBuilder)
 

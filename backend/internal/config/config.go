@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Model            string
 	WorkDir          string
+	ProjectRoot      string
 	APIKey           string
 	BaseURL          string
 	Timeout          int
@@ -21,6 +22,7 @@ type Config struct {
 
 func LoadConfig() (*Config, error) {
 	loadDotEnv()
+	projectRoot := findProjectRoot()
 
 	apiKey := os.Getenv("DASHSCOPE_API_KEY")
 	if apiKey == "" {
@@ -32,6 +34,7 @@ func LoadConfig() (*Config, error) {
 	return &Config{
 		Model:            "glm-5",
 		WorkDir:          workDir,
+		ProjectRoot:      projectRoot,
 		APIKey:           apiKey,
 		BaseURL:          "https://coding.dashscope.aliyuncs.com/v1",
 		Timeout:          120,
@@ -60,6 +63,29 @@ func loadDotEnv() {
 		}
 		dir = parent
 	}
+}
+
+func findProjectRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+
+	for i := 0; i < 20; i++ {
+		gitPath := filepath.Join(dir, ".git")
+		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	cwd, _ := os.Getwd()
+	return cwd
 }
 
 func getWorkingDir() string {
