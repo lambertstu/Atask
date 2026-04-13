@@ -8,6 +8,8 @@
 # JSON files
 *.json
 *.jsonl
+*.log
+*.exp
 
 # IDEs
 .idea/
