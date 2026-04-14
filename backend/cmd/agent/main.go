@@ -83,7 +83,7 @@ func main() {
 
 	// 7. 初始化权限和 Hook 管理
 	permissionMgr := security.NewPermissionManager("plan", cfg.WorkDir)
-	hookMgr := events.NewHookManager(cfg.WorkDir, false)
+	hookMgr := events.NewHookManager(cfg.WorkDir)
 
 	// 8. 创建引擎组件
 	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.ProjectRoot, cfg.Model)

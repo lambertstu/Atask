@@ -9,10 +9,8 @@ import (
 )
 
 func TestNewHookManager(t *testing.T) {
-	tempDir := testutil.NewTempDir(t)
-	defer tempDir.Cleanup()
-
-	hm := NewHookManager(tempDir.Path, false)
+	tempDir := "/Users/libing/gitProject/Atask/backend/pkg/events"
+	hm := NewHookManager(tempDir)
 	assert.NotNil(t, hm)
 }
 
@@ -20,7 +18,7 @@ func TestHookManager_RunHooks(t *testing.T) {
 	tempDir := testutil.NewTempDir(t)
 	defer tempDir.Cleanup()
 
-	hm := NewHookManager(tempDir.Path, false)
+	hm := NewHookManager(tempDir.Path)
 
 	result := hm.RunHooks("PreToolUse", map[string]interface{}{
 		"tool_name":  "test",
@@ -41,7 +39,7 @@ func TestHookManager_WithConfig(t *testing.T) {
 		}
 	}`)
 
-	hm := NewHookManager(tempDir.Path, false)
+	hm := NewHookManager(tempDir.Path)
 	assert.NotNil(t, hm)
 }
 

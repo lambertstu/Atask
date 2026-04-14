@@ -36,14 +36,12 @@ type HookResult struct {
 type HookManager struct {
 	hooks   map[string][]HookDefinition
 	workDir string
-	sdkMode bool
 }
 
-func NewHookManager(workDir string, sdkMode bool) *HookManager {
+func NewHookManager(workDir string) *HookManager {
 	hm := &HookManager{
 		hooks:   make(map[string][]HookDefinition),
 		workDir: workDir,
-		sdkMode: sdkMode,
 	}
 
 	configPath := filepath.Join(workDir, ".hooks.json")
