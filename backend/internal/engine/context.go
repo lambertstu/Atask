@@ -146,7 +146,7 @@ func (cm *ContextManagerImpl) AutoCompact(messages []openai.ChatCompletionMessag
 }
 
 func (cm *ContextManagerImpl) SaveLargeOutput(toolName, output string) string {
-	if len(output) <= 6000 {
+	if len(output) <= 10000 {
 		return output
 	}
 

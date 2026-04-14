@@ -14,19 +14,13 @@ import (
 const SubagentSystem = "You are a coding subagent. Complete the given task, then summarize your findings."
 
 var ExcludedChildTools = map[string]bool{
-	"todo":             true,
-	"task":             true,
-	"compact":          true,
-	"save_memory":      true,
-	"task_create":      true,
-	"task_update":      true,
-	"task_list":        true,
-	"task_get":         true,
-	"background_run":   true,
-	"check_background": true,
-	"cron_create":      true,
-	"cron_delete":      true,
-	"cron_list":        true,
+	"task":           true, // 防止递归创建子代理
+	"todo":           true, // 任务规划由主代理管理
+	"task_create":    true, // 任务创建由主代理管理
+	"task_update":    true, // 任务更新由主代理管理
+	"background_run": true, // 后台任务由主代理控制
+	"cron_create":    true, // 定时任务创建由主代理管理
+	"cron_delete":    true, // 定时任务删除由主代理管理
 }
 
 type SubagentRunner struct {

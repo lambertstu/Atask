@@ -14,24 +14,24 @@ const TrustMarker = ".claude/.claude_trusted"
 var Modes = []string{"plan", "build"}
 
 var ReadOnlyTools = map[string]bool{
-	"read_file":        true,
-	"search_files":     true,
-	"grep_code":        true,
+	"read_file":    true,
+	"search_files": true,
+	"grep_code":    true,
+	"webfetch":     true,
+}
+
+var SystemTools = map[string]bool{
+	"todo":             true,
+	"task_create":      true,
+	"task_update":      true,
+	"task":             true,
+	"save_memory":      true,
+	"load_skill":       true,
+	"compact":          true,
 	"task_list":        true,
 	"task_get":         true,
 	"check_background": true,
 	"cron_list":        true,
-	"compact":          true,
-	"webfetch":         true,
-}
-
-var SystemTools = map[string]bool{
-	"todo":        true,
-	"task_create": true,
-	"task_update": true,
-	"task":        true,
-	"save_memory": true,
-	"load_skill":  true,
 }
 
 var WriteTools = map[string]bool{
