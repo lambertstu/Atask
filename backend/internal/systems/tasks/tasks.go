@@ -248,7 +248,7 @@ func (t *TaskCreateTool) Name() string {
 }
 
 func (t *TaskCreateTool) Description() string {
-	return "Create a new task with subject and description."
+	return "Global Task Board: Create a new persistent ticket/task with subject and description."
 }
 
 func (t *TaskCreateTool) Execute(ctx context.Context, args map[string]interface{}) string {
@@ -297,7 +297,7 @@ func (t *TaskUpdateTool) Name() string {
 }
 
 func (t *TaskUpdateTool) Description() string {
-	return "Update task status, owner, and dependencies."
+	return "Global Task Board: Update a persistent task's status, owner, and dependencies."
 }
 
 func (t *TaskUpdateTool) Execute(ctx context.Context, args map[string]interface{}) string {
@@ -374,7 +374,7 @@ func (t *TaskListTool) Name() string {
 }
 
 func (t *TaskListTool) Description() string {
-	return "List all tasks."
+	return "Global Task Board: List all persistent project tasks."
 }
 
 func (t *TaskListTool) Execute(ctx context.Context, args map[string]interface{}) string {
@@ -408,7 +408,7 @@ func (t *TaskGetTool) Name() string {
 }
 
 func (t *TaskGetTool) Description() string {
-	return "Get details of a specific task."
+	return "Global Task Board: Get details of a specific persistent task."
 }
 
 func (t *TaskGetTool) Execute(ctx context.Context, args map[string]interface{}) string {

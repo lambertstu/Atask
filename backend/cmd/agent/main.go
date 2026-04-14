@@ -76,7 +76,7 @@ func main() {
 
 	// 注册 Subagent 工具
 	subagentRunner := subagent.NewSubagentRunner(llmClient, registry, cfg.WorkDir, cfg.Model)
-	registry.Register(subagent.NewTaskTool(subagentRunner))
+	registry.Register(subagent.NewDelegateSubagentTool(subagentRunner))
 
 	// 注册 Compact 工具
 	registry.Register(engine.NewCompactTool())

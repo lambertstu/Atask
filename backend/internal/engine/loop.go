@@ -131,7 +131,7 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 				results[idx] = output
 			}
 
-			if toolCall.Function.Name == "task" {
+			if toolCall.Function.Name == "delegate_subagent" {
 				printMu.Lock()
 				fmt.Printf("\033[36m[Subagent Started]\033[0m Background task launched: %s\n", toolCall.Function.Arguments)
 				printMu.Unlock()

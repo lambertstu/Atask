@@ -14,13 +14,13 @@ import (
 const SubagentSystem = "You are a coding subagent. Complete the given task, then summarize your findings."
 
 var ExcludedChildTools = map[string]bool{
-	"task":           true, // 防止递归创建子代理
-	"todo":           true, // 任务规划由主代理管理
-	"task_create":    true, // 任务创建由主代理管理
-	"task_update":    true, // 任务更新由主代理管理
-	"background_run": true, // 后台任务由主代理控制
-	"cron_create":    true, // 定时任务创建由主代理管理
-	"cron_delete":    true, // 定时任务删除由主代理管理
+	"delegate_subagent": true, // 防止递归创建子代理
+	"todo":              true, // 任务规划由主代理管理
+	"task_create":       true, // 任务创建由主代理管理
+	"task_update":       true, // 任务更新由主代理管理
+	"background_run":    true, // 后台任务由主代理控制
+	"cron_create":       true, // 定时任务创建由主代理管理
+	"cron_delete":       true, // 定时任务删除由主代理管理
 }
 
 type SubagentRunner struct {
@@ -129,23 +129,23 @@ func (sr *SubagentRunner) Run(ctx context.Context, prompt, description string) s
 	return "(subagent exceeded max turns)"
 }
 
-type TaskTool struct {
+type DelegateSubagentTool struct {
 	runner *SubagentRunner
 }
 
-func NewTaskTool(runner *SubagentRunner) tools.Tool {
-	return &TaskTool{runner: runner}
+func NewDelegateSubagentTool(runner *SubagentRunner) tools.Tool {
+	return &DelegateSubagentTool{runner: runner}
 }
 
-func (t *TaskTool) Name() string {
-	return "task"
+func (t *DelegateSubagentTool) Name() string {
+	return "delegate_subagent"
 }
 
-func (t *TaskTool) Description() string {
-	return "Delegate a subtask to a subagent with clean context."
+func (t *DelegateSubagentTool) Description() string {
+	return "Delegate a complex, independent problem to a new AI subagent. The subagent runs independently and returns a summary. Do NOT use this to create a task ticket."
 }
 
-func (t *TaskTool) Execute(ctx context.Context, args map[string]interface{}) string {
+func (t *DelegateSubagentTool) Execute(ctx context.Context, args map[string]interface{}) string {
 	prompt := ""
 	description := ""
 
@@ -163,7 +163,7 @@ func (t *TaskTool) Execute(ctx context.Context, args map[string]interface{}) str
 	return t.runner.Run(ctx, prompt, description)
 }
 
-func (t *TaskTool) Schema() openai.Tool {
+func (t *DelegateSubagentTool) Schema() openai.Tool {
 	return openai.Tool{
 		Type: openai.ToolTypeFunction,
 		Function: &openai.FunctionDefinition{

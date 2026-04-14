@@ -131,7 +131,7 @@ func TestNewTodoTool(t *testing.T) {
 	tool := NewTodoTool()
 	assert.NotNil(t, tool)
 	assert.Equal(t, "todo", tool.Name())
-	assert.Equal(t, "Update task list. Track progress on multi-step tasks.", tool.Description())
+	assert.Equal(t, "Manage a short-term checklist (TODOs) for your current execution steps. Do NOT use this for global project tracking or delegating to subagents.", tool.Description())
 }
 
 func TestTodoTool_Execute(t *testing.T) {

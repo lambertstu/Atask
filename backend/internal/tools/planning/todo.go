@@ -118,7 +118,7 @@ func (t *TodoTool) Name() string {
 }
 
 func (t *TodoTool) Description() string {
-	return "Update task list. Track progress on multi-step tasks."
+	return "Manage a short-term checklist (TODOs) for your current execution steps. Do NOT use this for global project tracking or delegating to subagents."
 }
 
 func (t *TodoTool) Execute(ctx context.Context, args map[string]interface{}) string {

@@ -21,17 +21,17 @@ var ReadOnlyTools = map[string]bool{
 }
 
 var SystemTools = map[string]bool{
-	"todo":             true,
-	"task_create":      true,
-	"task_update":      true,
-	"task":             true,
-	"save_memory":      true,
-	"load_skill":       true,
-	"compact":          true,
-	"task_list":        true,
-	"task_get":         true,
-	"check_background": true,
-	"cron_list":        true,
+	"todo":              true,
+	"task_create":       true,
+	"task_update":       true,
+	"delegate_subagent": true,
+	"save_memory":       true,
+	"load_skill":        true,
+	"compact":           true,
+	"task_list":         true,
+	"task_get":          true,
+	"check_background":  true,
+	"cron_list":         true,
 }
 
 var WriteTools = map[string]bool{
