@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -41,6 +42,18 @@ var WriteTools = map[string]bool{
 	"background_run": true,
 	"cron_create":    true,
 	"cron_delete":    true,
+}
+
+type BlockingRequest struct {
+	ToolName   string
+	ToolInput  map[string]interface{}
+	Decision   map[string]interface{}
+	ResponseCh chan BlockingResponse
+}
+
+type BlockingResponse struct {
+	Approved   bool
+	AddAllowed string
 }
 
 type BashValidator struct {
@@ -116,6 +129,7 @@ type PermissionManager struct {
 	bashValidator         *BashValidator
 	checkerChain          PermissionChecker
 	blockedCallback       func(toolName string, toolInput map[string]interface{})
+	blockingChan          chan BlockingRequest
 }
 
 func NewPermissionManager(mode string, workDir string) *PermissionManager {
@@ -192,6 +206,31 @@ func (p *PermissionManager) AskUser(toolName string, toolInput map[string]interf
 }
 
 func (p *PermissionManager) HandleAsk(toolName string, toolInput map[string]interface{}, decision map[string]interface{}) bool {
+	if p.blockingChan != nil {
+		responseCh := make(chan BlockingResponse, 1)
+		p.blockingChan <- BlockingRequest{
+			ToolName:   toolName,
+			ToolInput:  toolInput,
+			Decision:   decision,
+			ResponseCh: responseCh,
+		}
+
+		select {
+		case resp := <-responseCh:
+			if resp.Approved {
+				if resp.AddAllowed != "" {
+					p.AddAllowedDir(resp.AddAllowed)
+				}
+				p.consecutiveDenials = 0
+				return true
+			}
+			p.consecutiveDenials++
+			return false
+		default:
+			return false
+		}
+	}
+
 	if p.blockedCallback != nil {
 		p.blockedCallback(toolName, toolInput)
 		return false
@@ -287,4 +326,25 @@ func (p *PermissionManager) GetAllowedDirs() []string {
 
 func (p *PermissionManager) SetBlockedCallback(cb func(toolName string, toolInput map[string]interface{})) {
 	p.blockedCallback = cb
+}
+
+func (p *PermissionManager) SetBlockingChannel(ch chan BlockingRequest) {
+	p.blockingChan = ch
+}
+
+func (p *PermissionManager) GetBlockingChannel() chan BlockingRequest {
+	return p.blockingChan
+}
+
+func (p *PermissionManager) IsBlockingMode() bool {
+	return p.blockingChan != nil
+}
+
+func (p *PermissionManager) WaitForDecision(ctx context.Context, responseCh chan BlockingResponse) (BlockingResponse, error) {
+	select {
+	case resp := <-responseCh:
+		return resp, nil
+	case <-ctx.Done():
+		return BlockingResponse{Approved: false}, ctx.Err()
+	}
 }

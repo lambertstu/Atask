@@ -1,0 +1,78 @@
+syntax = "v1"
+
+type (
+	CreateSessionRequest {
+		ProjectPath string `json:"project_path"`
+		Model       string `json:"model,optional"`
+	}
+	
+	SessionResponse {
+		ID          string `json:"id"`
+		ProjectPath string `json:"project_path"`
+		Model       string `json:"model"`
+		State       string `json:"state"`
+		CreatedAt   string `json:"created_at"`
+		BlockedOn   string `json:"blocked_on,optional"`
+		BlockedTool string `json:"blocked_tool,optional"`
+	}
+	
+	SessionListResponse {
+		Sessions []SessionResponse `json:"sessions"`
+	}
+	
+	SubmitInputRequest {
+		Input string `json:"input"`
+		Mode  string `json:"mode,optional"`
+	}
+	
+	ApprovePlanRequest {}
+	
+	UnblockRequest {
+		Response string `json:"response"`
+		Approved bool   `json:"approved"`
+		AddAllowed string `json:"add_allowed,optional"`
+	}
+	
+	SessionEvent {
+		Type      string                 `json:"type"`
+		SessionID string                 `json:"session_id"`
+		Timestamp string                 `json:"timestamp"`
+		Data      map[string]interface{} `json:"data"`
+	}
+	
+	ErrorResponse {
+		Error string `json:"error"`
+	}
+)
+
+@server (
+	prefix: /api
+)
+service agent-api {
+	@handler CreateSession
+	post /sessions (CreateSessionRequest) returns (SessionResponse)
+	
+	@handler ListSessions
+	get /sessions returns (SessionListResponse)
+	
+	@handler GetSession
+	get /sessions/:id returns (SessionResponse)
+	
+	@handler SubmitInput
+	post /sessions/:id/input (SubmitInputRequest) returns (SessionResponse)
+	
+	@handler ApprovePlan
+	post /sessions/:id/approve returns (SessionResponse)
+	
+	@handler UnblockSession
+	post /sessions/:id/unblock (UnblockRequest) returns (SessionResponse)
+}
+
+@server (
+	prefix: /api
+	sse: true
+)
+service agent-api {
+	@handler StreamSessionEvents
+	get /sessions/:id/events returns (SessionEvent)
+}

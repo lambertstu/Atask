@@ -1,9 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -11,20 +11,23 @@ import (
 	"agent-base/internal/engine"
 	"agent-base/internal/llm"
 	"agent-base/internal/systems/memory"
-	"agent-base/internal/systems/project"
 	"agent-base/internal/systems/session"
 	"agent-base/internal/systems/skills"
-	"agent-base/internal/systems/subagent"
 	"agent-base/internal/systems/tasks"
 	"agent-base/internal/tools"
 	"agent-base/internal/tools/builtin"
 	"agent-base/internal/tools/planning"
-	"agent-base/pkg/api/websocket"
+	apirest "agent-base/pkg/api/rest"
+	sse "agent-base/pkg/api/sse"
 	"agent-base/pkg/events"
-	"agent-base/pkg/security"
+
+	gorest "github.com/zeromicro/go-zero/rest"
 )
 
 func main() {
+	port := flag.Int("port", 8080, "server port")
+	flag.Parse()
+
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
@@ -36,8 +39,6 @@ func main() {
 	registry := tools.NewDefaultRegistry()
 	registry.Register(builtin.NewBashTool(cfg.WorkDir, cfg.BashTimeout))
 	registry.Register(builtin.NewReadFileTool(cfg.WorkDir))
-	registry.Register(builtin.NewSearchFilesTool(cfg.WorkDir))
-	registry.Register(builtin.NewGrepCodeTool(cfg.WorkDir))
 	registry.Register(builtin.NewWriteFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewEditFileTool(cfg.WorkDir))
 	registry.Register(builtin.NewWebFetchTool())
@@ -69,22 +70,22 @@ func main() {
 	skillLoader.LoadAll()
 	registry.Register(skills.NewLoadSkillTool(skillLoader))
 
-	subagentRunner := subagent.NewSubagentRunner(llmClient, registry, cfg.WorkDir, cfg.Model)
-	registry.Register(subagent.NewDelegateSubagentTool(subagentRunner))
-
 	registry.Register(engine.NewCompactTool())
 
-	permissionMgr := security.NewPermissionManager("plan", cfg.WorkDir)
 	hookMgr := events.NewHookManager(cfg.WorkDir)
 
 	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.ProjectRoot, cfg.Model)
 	contextMgr := engine.NewContextManager(llmClient, cfg.Model, cfg.WorkDir, cfg.ContextThreshold)
 	recoveryMgr := engine.NewRecoveryManager(llmClient, cfg.Model, contextMgr, promptBuilder)
 
+	eventBus := events.NewEventBus()
+
+	sessionManager := session.NewSessionManager(cfg.ProjectRoot, eventBus, cfg.WorkDir)
+
 	agentEngine := engine.NewAgentEngine(
 		llmClient,
 		registry,
-		permissionMgr,
+		nil,
 		hookMgr,
 		promptBuilder,
 		contextMgr,
@@ -93,19 +94,37 @@ func main() {
 		cfg.ContextThreshold,
 	)
 
-	eventBus := events.NewEventBus()
+	restHandler := apirest.NewHandler(sessionManager, agentEngine, eventBus)
+	sseHandler := sse.NewHandler(eventBus)
 
-	projectManager := project.NewProjectManager(cfg.ProjectRoot)
-	sessionManager := session.NewSessionManager(cfg.ProjectRoot, eventBus, cfg.WorkDir)
+	server := gorest.MustNewServer(gorest.RestConf{
+		Host: "0.0.0.0",
+		Port: *port,
+	})
+	defer server.Stop()
 
-	wsHandler := websocket.NewHandler(projectManager, agentEngine, permissionMgr)
-	wsHandler.SetSessionManager(sessionManager)
+	server.AddRoutes([]gorest.Route{
+		{Method: "POST", Path: "/api/sessions", Handler: restHandler.CreateSession},
+		{Method: "GET", Path: "/api/sessions", Handler: restHandler.ListSessions},
+		{Method: "GET", Path: "/api/sessions/:id", Handler: restHandler.GetSession},
+		{Method: "POST", Path: "/api/sessions/:id/input", Handler: restHandler.SubmitInput},
+		{Method: "POST", Path: "/api/sessions/:id/approve", Handler: restHandler.ApprovePlan},
+		{Method: "POST", Path: "/api/sessions/:id/unblock", Handler: restHandler.UnblockSession},
+	})
 
-	http.HandleFunc("/ws", wsHandler.HandleWS)
+	server.AddRoutes([]gorest.Route{
+		{Method: "GET", Path: "/api/sessions/:id/events", Handler: sseHandler.StreamSessionEvents},
+	}, gorest.WithSSE())
 
-	addr := ":8080"
-	log.Printf("WebSocket server starting on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("Server failed: %v", err)
-	}
+	log.Printf("REST+SSE server starting on port %d", *port)
+	log.Printf("API endpoints:")
+	log.Printf("  POST /api/sessions          - Create session")
+	log.Printf("  GET  /api/sessions          - List sessions")
+	log.Printf("  GET  /api/sessions/:id      - Get session")
+	log.Printf("  POST /api/sessions/:id/input    - Submit input")
+	log.Printf("  POST /api/sessions/:id/approve  - Approve plan")
+	log.Printf("  POST /api/sessions/:id/unblock  - Unblock session")
+	log.Printf("  GET  /api/sessions/:id/events   - SSE stream")
+
+	server.Start()
 }

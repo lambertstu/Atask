@@ -11,6 +11,10 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type EventEmitter interface {
+	Emit(eventType events.EventType, data map[string]interface{})
+}
+
 type PromptBuilder interface {
 	Build() string
 }
