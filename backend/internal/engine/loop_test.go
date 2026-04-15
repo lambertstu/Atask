@@ -22,7 +22,7 @@ func TestNewAgentEngine(t *testing.T) {
 	registry := tools.NewDefaultRegistry()
 	pm := security.NewPermissionManager("default", tempDir.Path)
 	hm := events.NewHookManager(tempDir.Path)
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	cm := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 	rm := NewRecoveryManager(mockLLM, "test-model", cm, builder)
 
@@ -40,7 +40,7 @@ func TestAgentEngine_Run_NoToolCalls(t *testing.T) {
 	registry := tools.NewDefaultRegistry()
 	pm := security.NewPermissionManager("auto", tempDir.Path)
 	hm := events.NewHookManager(tempDir.Path)
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	cm := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 	rm := NewRecoveryManager(mockLLM, "test-model", cm, builder)
 
@@ -65,7 +65,7 @@ func TestAgentEngine_ExecuteTool(t *testing.T) {
 
 	pm := security.NewPermissionManager("auto", tempDir.Path)
 	hm := events.NewHookManager(tempDir.Path)
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	cm := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 	rm := NewRecoveryManager(mockLLM, "test-model", cm, builder)
 

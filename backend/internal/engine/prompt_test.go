@@ -12,7 +12,7 @@ func TestNewSystemPromptBuilder(t *testing.T) {
 	tempDir := testutil.NewTempDir(t)
 	defer tempDir.Cleanup()
 
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	assert.NotNil(t, builder)
 }
 
@@ -20,7 +20,7 @@ func TestPromptBuilder_Build(t *testing.T) {
 	tempDir := testutil.NewTempDir(t)
 	defer tempDir.Cleanup()
 
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 
 	prompt := builder.Build()
 	assert.Contains(t, prompt, "agent")
@@ -31,7 +31,7 @@ func TestPromptBuilder_BuildCore(t *testing.T) {
 	tempDir := testutil.NewTempDir(t)
 	defer tempDir.Cleanup()
 
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 
 	core := builder.buildCore()
 	assert.Contains(t, core, "agent")
@@ -41,7 +41,7 @@ func TestPromptBuilder_BuildDynamicContext(t *testing.T) {
 	tempDir := testutil.NewTempDir(t)
 	defer tempDir.Cleanup()
 
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 
 	dynamic := builder.buildDynamicContext()
 	assert.Contains(t, dynamic, "Working directory")
@@ -62,7 +62,7 @@ description: Test memory
 Test memory content.`
 	memDir.CreateFile("test.md", memContent)
 
-	builder := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 
 	prompt := builder.Build()
 	assert.Contains(t, prompt, "agent")

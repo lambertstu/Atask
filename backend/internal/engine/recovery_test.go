@@ -15,7 +15,7 @@ func TestNewRecoveryManager(t *testing.T) {
 	defer tempDir.Cleanup()
 
 	mockLLM := testutil.NewMockLLMClient()
-	mockPrompt := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	mockPrompt := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	mockContext := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 
 	rm := NewRecoveryManager(mockLLM, "test-model", mockContext, mockPrompt)
@@ -29,7 +29,7 @@ func TestRecoveryManager_Success(t *testing.T) {
 	mockLLM := testutil.NewMockLLMClient()
 	mockLLM.AddTextResponse("Test response")
 
-	mockPrompt := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	mockPrompt := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	mockContext := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 
 	rm := NewRecoveryManager(mockLLM, "test-model", mockContext, mockPrompt)
@@ -53,7 +53,7 @@ func TestRecoveryManager_Retry(t *testing.T) {
 	mockLLM.AddErrorResponse(errors.New("API error"))
 	mockLLM.AddTextResponse("Success after retry")
 
-	mockPrompt := NewSystemPromptBuilder(tempDir.Path, "test-model")
+	mockPrompt := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
 	mockContext := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
 
 	rm := NewRecoveryManager(mockLLM, "test-model", mockContext, mockPrompt)

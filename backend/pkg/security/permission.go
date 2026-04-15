@@ -115,6 +115,7 @@ type PermissionManager struct {
 	maxConsecutiveDenials int
 	bashValidator         *BashValidator
 	checkerChain          PermissionChecker
+	blockedCallback       func(toolName string, toolInput map[string]interface{})
 }
 
 func NewPermissionManager(mode string, workDir string) *PermissionManager {
@@ -191,6 +192,11 @@ func (p *PermissionManager) AskUser(toolName string, toolInput map[string]interf
 }
 
 func (p *PermissionManager) HandleAsk(toolName string, toolInput map[string]interface{}, decision map[string]interface{}) bool {
+	if p.blockedCallback != nil {
+		p.blockedCallback(toolName, toolInput)
+		return false
+	}
+
 	if decision["needs_path_auth"] == true {
 		requestedPath := decision["requested_path"].(string)
 		requestedDir := filepath.Dir(requestedPath)
@@ -277,4 +283,8 @@ func (p *PermissionManager) AddAllowedDir(dir string) {
 
 func (p *PermissionManager) GetAllowedDirs() []string {
 	return p.allowedDirs
+}
+
+func (p *PermissionManager) SetBlockedCallback(cb func(toolName string, toolInput map[string]interface{})) {
+	p.blockedCallback = cb
 }
