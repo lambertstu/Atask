@@ -88,10 +88,7 @@ func (e *AgentEngine) RunStream(
 		results := make([]string, len(assistantMessage.ToolCalls))
 		errResults := make([]error, len(assistantMessage.ToolCalls))
 
-		type preparedTool struct {
-			execFunc func() string
-		}
-		preparedTools := make([]preparedTool, len(assistantMessage.ToolCalls))
+		preparedExecFuncs := make([]func() string, len(assistantMessage.ToolCalls))
 
 		for i, tc := range assistantMessage.ToolCalls {
 			index := i
@@ -143,13 +140,13 @@ func (e *AgentEngine) RunStream(
 				}
 			}
 
-			preparedTools[index] = preparedTool{execFunc: execFunc}
+			preparedExecFuncs[index] = execFunc
 		}
 
 		for i, tc := range assistantMessage.ToolCalls {
 			index := i
 			toolCall := tc
-			prep := preparedTools[index]
+			execFunc := preparedExecFuncs[index]
 
 			if errResults[index] != nil {
 				continue
@@ -175,9 +172,9 @@ func (e *AgentEngine) RunStream(
 				go func(idx int, call openai.ToolCall, fn func() string) {
 					defer wg.Done()
 					runTool(idx, call, fn)
-				}(index, toolCall, prep.execFunc)
+				}(index, toolCall, execFunc)
 			} else {
-				runTool(index, toolCall, prep.execFunc)
+				runTool(index, toolCall, execFunc)
 			}
 		}
 

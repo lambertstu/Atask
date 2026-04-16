@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 
 	"github.com/joho/godotenv"
+	"github.com/zeromicro/go-zero/rest"
 )
 
 type Config struct {
+	rest.RestConf
 	Model            string
 	WorkDir          string
 	ProjectRoot      string
 	APIKey           string
 	BaseURL          string
-	Timeout          int
-	MaxTokens        int
 	ContextThreshold int
 	BashTimeout      int
 }
@@ -32,13 +32,15 @@ func LoadConfig() (*Config, error) {
 	workDir := getWorkingDir()
 
 	return &Config{
+		RestConf: rest.RestConf{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
 		Model:            "glm-5",
 		WorkDir:          workDir,
 		ProjectRoot:      projectRoot,
 		APIKey:           apiKey,
 		BaseURL:          "https://coding.dashscope.aliyuncs.com/v1",
-		Timeout:          120,
-		MaxTokens:        8192,
 		ContextThreshold: 50000,
 		BashTimeout:      120,
 	}, nil

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -47,9 +48,8 @@ func NewEvent(eventType EventType, sessionID string, data map[string]interface{}
 }
 
 type subscriber struct {
-	id       string
-	channel  chan Event
-	doneChan chan struct{}
+	id      string
+	channel chan Event
 }
 
 type EventBus struct {
@@ -73,9 +73,8 @@ func (b *EventBus) Subscribe(sessionID string) (<-chan Event, string) {
 
 	subID := generateSubscriberID()
 	sub := &subscriber{
-		id:       subID,
-		channel:  make(chan Event, EventChannelBufferSize),
-		doneChan: make(chan struct{}),
+		id:      subID,
+		channel: make(chan Event, EventChannelBufferSize),
 	}
 	b.subscribers[sessionID][subID] = sub
 
@@ -96,7 +95,6 @@ func (b *EventBus) Unsubscribe(sessionID string, subscriberID string) {
 		return
 	}
 
-	close(sub.doneChan)
 	close(sub.channel)
 	delete(sessionSubs, subscriberID)
 
@@ -108,9 +106,8 @@ func (b *EventBus) Unsubscribe(sessionID string, subscriberID string) {
 func (b *EventBus) Publish(sessionID string, event Event) {
 	b.mu.RLock()
 	sessionSubs, ok := b.subscribers[sessionID]
-	b.mu.RUnlock()
-
 	if !ok {
+		b.mu.RUnlock()
 		return
 	}
 
@@ -120,12 +117,11 @@ func (b *EventBus) Publish(sessionID string, event Event) {
 		default:
 		}
 	}
+	b.mu.RUnlock()
 }
 
 func (b *EventBus) PublishGlobal(event Event) {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-
 	for _, sessionSubs := range b.subscribers {
 		for _, sub := range sessionSubs {
 			select {
@@ -134,6 +130,7 @@ func (b *EventBus) PublishGlobal(event Event) {
 			}
 		}
 	}
+	b.mu.RUnlock()
 }
 
 func (b *EventBus) HasSubscribers(sessionID string) bool {
@@ -168,12 +165,14 @@ func (b *EventBus) CloseSession(sessionID string) {
 	}
 
 	for _, sub := range sessionSubs {
-		close(sub.doneChan)
 		close(sub.channel)
 	}
 	delete(b.subscribers, sessionID)
 }
 
+var subscriberCounter uint64
+
 func generateSubscriberID() string {
-	return fmt.Sprintf("sub_%d", time.Now().UnixNano())
+	id := atomic.AddUint64(&subscriberCounter, 1)
+	return fmt.Sprintf("sub_%d", id)
 }

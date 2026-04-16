@@ -91,6 +91,11 @@ func (sm *SessionManager) loadAll() {
 		if err := json.Unmarshal(data, &session); err != nil {
 			continue
 		}
+		ctx, cancel := context.WithCancel(context.Background())
+		session.Ctx = ctx
+		session.CancelFunc = cancel
+		session.PermissionMgr = security.NewPermissionManager("plan", sm.workDir)
+		session.BlockedResponse = make(chan PermissionDecision, 1)
 		sm.sessions[session.ID] = &session
 	}
 }
@@ -138,7 +143,7 @@ func (sm *SessionManager) ListSessions(projectPath string) []*Session {
 
 	var list []*Session
 	for _, s := range sm.sessions {
-		if s.ProjectPath == projectPath {
+		if filepath.Base(s.ProjectPath) == projectPath {
 			list = append(list, s)
 		}
 	}

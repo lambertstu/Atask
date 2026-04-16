@@ -1,11 +1,16 @@
 syntax = "v1"
 
+info (
+	title:       "Atask"
+	description: "Atask-api"
+	version:     "v1"
+)
+
 type (
 	CreateSessionRequest {
 		ProjectPath string `json:"project_path"`
 		Model       string `json:"model,optional"`
 	}
-	
 	SessionResponse {
 		ID          string `json:"id"`
 		ProjectPath string `json:"project_path"`
@@ -15,33 +20,53 @@ type (
 		BlockedOn   string `json:"blocked_on,optional"`
 		BlockedTool string `json:"blocked_tool,optional"`
 	}
-	
+	SessionListRequest {
+		ProjectPath string `form:"project_path,optional"`
+	}
 	SessionListResponse {
 		Sessions []SessionResponse `json:"sessions"`
 	}
-	
+	GetSessionRequest {
+		ID string `path:"id"`
+	}
 	SubmitInputRequest {
+		ID    string `path:"id"`
 		Input string `json:"input"`
 		Mode  string `json:"mode,optional"`
 	}
-	
-	ApprovePlanRequest {}
-	
+	ApprovePlanRequest {
+		ID string `path:"id"`
+	}
 	UnblockRequest {
-		Response string `json:"response"`
-		Approved bool   `json:"approved"`
+		ID         string `path:"id"`
+		Response   string `json:"response"`
+		Approved   bool   `json:"approved"`
 		AddAllowed string `json:"add_allowed,optional"`
 	}
-	
+	StreamSessionEventsRequest {
+		ID string `path:"id"`
+	}
 	SessionEvent {
 		Type      string                 `json:"type"`
 		SessionID string                 `json:"session_id"`
 		Timestamp string                 `json:"timestamp"`
 		Data      map[string]interface{} `json:"data"`
 	}
-	
 	ErrorResponse {
 		Error string `json:"error"`
+	}
+	ProjectResponse {
+		Path     string   `json:"path"`
+		Sessions []string `json:"sessions"`
+	}
+	ProjectListResponse {
+		Projects []ProjectResponse `json:"projects"`
+	}
+	CreateProjectRequest {
+		Path string `json:"path"`
+	}
+	GetProjectRequest {
+		name string `path:"name"`
 	}
 )
 
@@ -49,30 +74,40 @@ type (
 	prefix: /api
 )
 service agent-api {
+	@handler ListProjects
+	get /projects returns (ProjectListResponse)
+
+	@handler GetProject
+	get /projects/:name (GetProjectRequest) returns (ProjectResponse)
+
+	@handler CreateProject
+	post /projects (CreateProjectRequest) returns (ProjectResponse)
+
 	@handler CreateSession
 	post /sessions (CreateSessionRequest) returns (SessionResponse)
-	
+
 	@handler ListSessions
-	get /sessions returns (SessionListResponse)
-	
+	get /sessions (SessionListRequest) returns (SessionListResponse)
+
 	@handler GetSession
-	get /sessions/:id returns (SessionResponse)
-	
+	get /sessions/:id (GetSessionRequest) returns (SessionResponse)
+
 	@handler SubmitInput
 	post /sessions/:id/input (SubmitInputRequest) returns (SessionResponse)
-	
+
 	@handler ApprovePlan
-	post /sessions/:id/approve returns (SessionResponse)
-	
+	post /sessions/:id/approve (ApprovePlanRequest) returns (SessionResponse)
+
 	@handler UnblockSession
 	post /sessions/:id/unblock (UnblockRequest) returns (SessionResponse)
 }
 
 @server (
 	prefix: /api
-	sse: true
+	sse:    true
 )
 service agent-api {
 	@handler StreamSessionEvents
-	get /sessions/:id/events returns (SessionEvent)
+	get /sessions/:id/events (StreamSessionEventsRequest) returns (SessionEvent)
 }
+

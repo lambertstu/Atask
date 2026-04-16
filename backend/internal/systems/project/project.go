@@ -65,7 +65,8 @@ func (pm *ProjectManager) save() {
 }
 
 func (pm *ProjectManager) GetOrCreate(path string) *Project {
-	if project, exists := pm.projects[path]; exists {
+	key := filepath.Base(path)
+	if project, exists := pm.projects[key]; exists {
 		return project
 	}
 
@@ -73,7 +74,7 @@ func (pm *ProjectManager) GetOrCreate(path string) *Project {
 		Path:     path,
 		Sessions: []string{},
 	}
-	pm.projects[path] = project
+	pm.projects[key] = project
 	pm.save()
 	return project
 }
@@ -89,8 +90,8 @@ func (pm *ProjectManager) AddSession(projectPath, sessionID string) {
 	pm.save()
 }
 
-func (pm *ProjectManager) GetProject(path string) *Project {
-	return pm.projects[path]
+func (pm *ProjectManager) GetProject(name string) *Project {
+	return pm.projects[name]
 }
 
 func (pm *ProjectManager) ListProjects() []*Project {

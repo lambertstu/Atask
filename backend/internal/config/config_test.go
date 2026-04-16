@@ -23,8 +23,6 @@ func TestConfig_Defaults(t *testing.T) {
 	cfg, err := LoadConfig()
 	assert.NoError(t, err)
 
-	assert.Equal(t, 120, cfg.Timeout)
-	assert.Equal(t, 8192, cfg.MaxTokens)
 	assert.Equal(t, 50000, cfg.ContextThreshold)
 	assert.Equal(t, 120, cfg.BashTimeout)
 }

@@ -1,0 +1,10 @@
+Name: agent-api
+Host: 0.0.0.0
+Port: 8888
+Model: glm-5
+WorkDir: /Users/libing/gitProject/collect-crawler
+ProjectRoot: /Users/libing/gitProject/Atask
+APIKey: sk-sp-3fec10ad9d2e4db69b8eb39ca2f470cc
+BaseURL: "https://coding.dashscope.aliyuncs.com/v1"
+ContextThreshold: 50000
+BashTimeout: 120
