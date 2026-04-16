@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/zeromicro/go-zero/core/logx"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,6 +26,7 @@ import (
 )
 
 func main() {
+	logx.DisableStat()
 	ctx := context.Background()
 
 	cfg, err := config.LoadConfig()
