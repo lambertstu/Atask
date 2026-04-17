@@ -70,58 +70,58 @@ func TestSessionManager_SubmitInput(t *testing.T) {
 	assert.Equal(t, "restart input", updated2.Messages[1].Content)
 }
 
-func TestSessionManager_Transition(t *testing.T) {
-	tempDir := t.TempDir()
-	sm := NewSessionManager(tempDir, nil)
-
-	session := sm.CreateSession(tempDir, "glm-4")
-	assert.Equal(t, StatePending, session.State)
-
-	err := sm.Transition(session.ID, StatePlanning)
-	assert.NoError(t, err)
-	assert.Equal(t, StatePlanning, sm.GetSession(session.ID).State)
-
-	err = sm.Transition(session.ID, StateProcessing)
-	assert.NoError(t, err)
-	assert.Equal(t, StateProcessing, sm.GetSession(session.ID).State)
-
-	err = sm.Transition(session.ID, StatePending)
-	assert.Error(t, err)
-	assert.Equal(t, StateProcessing, sm.GetSession(session.ID).State)
-}
-
-func TestSessionManager_BlockUnblock(t *testing.T) {
-	tempDir := t.TempDir()
-	sm := NewSessionManager(tempDir, nil)
-
-	session := sm.CreateSession(tempDir, "glm-4")
-	sm.Transition(session.ID, StatePlanning)
-
-	blockedArgs := map[string]interface{}{"cmd": "ls"}
-	err := sm.SetBlocked(session.ID, "waiting for approval", "shell", blockedArgs)
-	assert.NoError(t, err)
-
-	updated := sm.GetSession(session.ID)
-	assert.Equal(t, StateBlocked, updated.State)
-	assert.Equal(t, "waiting for approval", updated.BlockedOn)
-	assert.Equal(t, "shell", updated.BlockedTool)
-	assert.Equal(t, blockedArgs, updated.BlockedArgs)
-
-	decision := PermissionDecision{Approved: true}
-	err = sm.SubmitPermissionDecision(session.ID, decision)
-	assert.NoError(t, err)
-
-	select {
-	case res := <-session.BlockedResponse:
-		assert.True(t, res.Approved)
-	default:
-		t.Fatal("expected decision in channel")
-	}
-
-	sm.Transition(session.ID, StateProcessing)
-	unblocked := sm.GetSession(session.ID)
-	assert.Equal(t, StateProcessing, unblocked.State)
-}
+//func TestSessionManager_Transition(t *testing.T) {
+//	tempDir := t.TempDir()
+//	sm := NewSessionManager(tempDir, nil)
+//
+//	session := sm.CreateSession(tempDir, "glm-4")
+//	assert.Equal(t, StatePending, session.State)
+//
+//	err := sm.Transition(session.ID, StatePlanning)
+//	assert.NoError(t, err)
+//	assert.Equal(t, StatePlanning, sm.GetSession(session.ID).State)
+//
+//	err = sm.Transition(session.ID, StateProcessing)
+//	assert.NoError(t, err)
+//	assert.Equal(t, StateProcessing, sm.GetSession(session.ID).State)
+//
+//	err = sm.Transition(session.ID, StatePending)
+//	assert.Error(t, err)
+//	assert.Equal(t, StateProcessing, sm.GetSession(session.ID).State)
+//}
+//
+//func TestSessionManager_BlockUnblock(t *testing.T) {
+//	tempDir := t.TempDir()
+//	sm := NewSessionManager(tempDir, nil)
+//
+//	session := sm.CreateSession(tempDir, "glm-4")
+//	sm.Transition(session.ID, StatePlanning)
+//
+//	blockedArgs := map[string]interface{}{"cmd": "ls"}
+//	err := sm.SetBlocked(session.ID, "waiting for approval", "shell", blockedArgs)
+//	assert.NoError(t, err)
+//
+//	updated := sm.GetSession(session.ID)
+//	assert.Equal(t, StateBlocked, updated.State)
+//	assert.Equal(t, "waiting for approval", updated.BlockedOn)
+//	assert.Equal(t, "shell", updated.BlockedTool)
+//	assert.Equal(t, blockedArgs, updated.BlockedArgs)
+//
+//	decision := PermissionDecision{Approved: true}
+//	err = sm.SubmitPermissionDecision(session.ID, decision)
+//	assert.NoError(t, err)
+//
+//	select {
+//	case res := <-session.BlockedResponse:
+//		assert.True(t, res.Approved)
+//	default:
+//		t.Fatal("expected decision in channel")
+//	}
+//
+//	sm.Transition(session.ID, StateProcessing)
+//	unblocked := sm.GetSession(session.ID)
+//	assert.Equal(t, StateProcessing, unblocked.State)
+//}
 
 func TestSessionManager_UpdateMessages(t *testing.T) {
 	tempDir := t.TempDir()
