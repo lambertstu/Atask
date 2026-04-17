@@ -5,6 +5,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"agent-base/internal/svc"
 
@@ -72,6 +73,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 		},
 		rest.WithPrefix("/api"),
+		rest.WithTimeout(3600000*time.Millisecond),
 		rest.WithSSE(),
 	)
 }

@@ -103,8 +103,9 @@ service agent-api {
 }
 
 @server (
-	prefix: /api
-	sse:    true
+	prefix:  /api
+	sse:     true
+	timeout: 1h
 )
 service agent-api {
 	@handler StreamSessionEvents
