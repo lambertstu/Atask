@@ -7,6 +7,14 @@ type ApprovePlanRequest struct {
 	ID string `path:"id"`
 }
 
+type ChatMessage struct {
+	Role             string     `json:"role"`
+	Content          string     `json:"content,optional"`
+	ReasoningContent string     `json:"reasoning_content,optional"`
+	ToolCalls        []ToolCall `json:"tool_calls,optional"`
+	ToolCallID       string     `json:"tool_call_id,optional"`
+}
+
 type CreateProjectRequest struct {
 	Path string `json:"path"`
 }
@@ -18,6 +26,11 @@ type CreateSessionRequest struct {
 
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+type FunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type GetProjectRequest struct {
@@ -53,13 +66,17 @@ type SessionListResponse struct {
 }
 
 type SessionResponse struct {
-	ID          string `json:"id"`
-	ProjectPath string `json:"project_path"`
-	Model       string `json:"model"`
-	State       string `json:"state"`
-	CreatedAt   string `json:"created_at"`
-	BlockedOn   string `json:"blocked_on,optional"`
-	BlockedTool string `json:"blocked_tool,optional"`
+	ID          string                 `json:"id"`
+	ProjectPath string                 `json:"project_path"`
+	Model       string                 `json:"model"`
+	State       string                 `json:"state"`
+	Mode        string                 `json:"mode"`
+	CreatedAt   string                 `json:"created_at"`
+	Input       string                 `json:"input"`
+	Messages    []ChatMessage          `json:"messages"`
+	BlockedOn   string                 `json:"blocked_on,optional"`
+	BlockedTool string                 `json:"blocked_tool,optional"`
+	BlockedArgs map[string]interface{} `json:"blocked_args,optional"`
 }
 
 type StreamSessionEventsRequest struct {
@@ -72,9 +89,14 @@ type SubmitInputRequest struct {
 	Mode  string `json:"mode,optional"`
 }
 
+type ToolCall struct {
+	ID       string       `json:"id"`
+	Type     string       `json:"type"`
+	Function FunctionCall `json:"function"`
+}
+
 type UnblockRequest struct {
 	ID         string `path:"id"`
-	Response   string `json:"response"`
 	Approved   bool   `json:"approved"`
 	AddAllowed string `json:"add_allowed,optional"`
 }

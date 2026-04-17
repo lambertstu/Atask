@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"agent-base/internal/svc"
+	"agent-base/internal/systems/session"
 	"agent-base/internal/types"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -31,15 +33,53 @@ func (l *ListSessionsLogic) ListSessions(req *types.SessionListRequest) (resp *t
 	sessions := l.svcCtx.SessionManager.ListSessions(req.ProjectPath)
 	var list []types.SessionResponse
 	for _, s := range sessions {
-		list = append(list, types.SessionResponse{
-			ID:          s.ID,
-			ProjectPath: s.ProjectPath,
-			Model:       s.Model,
-			State:       string(s.State),
-			CreatedAt:   s.CreatedAt.Format(time.RFC3339),
-			BlockedOn:   s.BlockedOn,
-			BlockedTool: s.BlockedTool,
-		})
+		list = append(list, convertSessionToResponse(s))
 	}
 	return &types.SessionListResponse{Sessions: list}, nil
+}
+
+func convertSessionToResponse(s *session.Session) types.SessionResponse {
+	return types.SessionResponse{
+		ID:          s.ID,
+		ProjectPath: s.ProjectPath,
+		Model:       s.Model,
+		State:       string(s.State),
+		Mode:        s.Mode,
+		CreatedAt:   s.CreatedAt.Format(time.RFC3339),
+		Input:       s.Input,
+		Messages:    convertMessages(s.Messages),
+		BlockedOn:   s.BlockedOn,
+		BlockedTool: s.BlockedTool,
+		BlockedArgs: s.BlockedArgs,
+	}
+}
+
+func convertMessages(msgs []openai.ChatCompletionMessage) []types.ChatMessage {
+	if msgs == nil {
+		return nil
+	}
+	result := make([]types.ChatMessage, 0, len(msgs))
+	for _, m := range msgs {
+		cm := types.ChatMessage{
+			Role:             string(m.Role),
+			Content:          m.Content,
+			ReasoningContent: m.ReasoningContent,
+			ToolCallID:       m.ToolCallID,
+		}
+		if len(m.ToolCalls) > 0 {
+			cm.ToolCalls = make([]types.ToolCall, 0, len(m.ToolCalls))
+			for _, tc := range m.ToolCalls {
+				cm.ToolCalls = append(cm.ToolCalls, types.ToolCall{
+					ID:   tc.ID,
+					Type: string(tc.Type),
+					Function: types.FunctionCall{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+		}
+		result = append(result, cm)
+	}
+	return result
 }

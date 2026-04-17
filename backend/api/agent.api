@@ -7,18 +7,38 @@ info (
 )
 
 type (
+	FunctionCall {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	}
+	ToolCall {
+		ID       string       `json:"id"`
+		Type     string       `json:"type"`
+		Function FunctionCall `json:"function"`
+	}
+	ChatMessage {
+		Role             string     `json:"role"`
+		Content          string     `json:"content,optional"`
+		ReasoningContent string     `json:"reasoning_content,optional"`
+		ToolCalls        []ToolCall `json:"tool_calls,optional"`
+		ToolCallID       string     `json:"tool_call_id,optional"`
+	}
 	CreateSessionRequest {
 		ProjectPath string `json:"project_path"`
 		Model       string `json:"model,optional"`
 	}
 	SessionResponse {
-		ID          string `json:"id"`
-		ProjectPath string `json:"project_path"`
-		Model       string `json:"model"`
-		State       string `json:"state"`
-		CreatedAt   string `json:"created_at"`
-		BlockedOn   string `json:"blocked_on,optional"`
-		BlockedTool string `json:"blocked_tool,optional"`
+		ID          string                 `json:"id"`
+		ProjectPath string                 `json:"project_path"`
+		Model       string                 `json:"model"`
+		State       string                 `json:"state"`
+		Mode        string                 `json:"mode"`
+		CreatedAt   string                 `json:"created_at"`
+		Input       string                 `json:"input"`
+		Messages    []ChatMessage          `json:"messages"`
+		BlockedOn   string                 `json:"blocked_on,optional"`
+		BlockedTool string                 `json:"blocked_tool,optional"`
+		BlockedArgs map[string]interface{} `json:"blocked_args,optional"`
 	}
 	SessionListRequest {
 		ProjectPath string `form:"project_path,optional"`
@@ -39,7 +59,6 @@ type (
 	}
 	UnblockRequest {
 		ID         string `path:"id"`
-		Response   string `json:"response"`
 		Approved   bool   `json:"approved"`
 		AddAllowed string `json:"add_allowed,optional"`
 	}

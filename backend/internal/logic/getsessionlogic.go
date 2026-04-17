@@ -6,7 +6,6 @@ package logic
 import (
 	"context"
 	"errors"
-	"time"
 
 	"agent-base/internal/svc"
 	"agent-base/internal/types"
@@ -34,13 +33,6 @@ func (l *GetSessionLogic) GetSession(req *types.GetSessionRequest) (*types.Sessi
 		return nil, errors.New("session not found")
 	}
 
-	return &types.SessionResponse{
-		ID:          sess.ID,
-		ProjectPath: sess.ProjectPath,
-		Model:       sess.Model,
-		State:       string(sess.State),
-		CreatedAt:   sess.CreatedAt.Format(time.RFC3339),
-		BlockedOn:   sess.BlockedOn,
-		BlockedTool: sess.BlockedTool,
-	}, nil
+	resp := convertSessionToResponse(sess)
+	return &resp, nil
 }
