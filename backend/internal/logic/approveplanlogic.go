@@ -43,7 +43,7 @@ func (l *ApprovePlanLogic) ApprovePlan(req *types.ApprovePlanRequest) (*types.Se
 		sess.PermissionMgr.SetMode("build")
 	}
 
-	go RunAgent(l.svcCtx.Engine, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
+	go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
 
 	sess = l.svcCtx.SessionManager.GetSession(req.ID)
 	return &types.SessionResponse{

@@ -47,7 +47,7 @@ func (l *SubmitInputLogic) SubmitInput(req *types.SubmitInputRequest) (*types.Se
 		sess.PermissionMgr.SetMode(mode)
 	}
 
-	go RunAgent(l.svcCtx.Engine, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
+	go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
 
 	return &types.SessionResponse{
 		ID:          sess.ID,

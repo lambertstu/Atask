@@ -90,8 +90,9 @@ func (pm *ProjectManager) AddSession(projectPath, sessionID string) {
 	pm.save()
 }
 
-func (pm *ProjectManager) GetProject(name string) *Project {
-	return pm.projects[name]
+func (pm *ProjectManager) GetProject(path string) *Project {
+	key := filepath.Base(path)
+	return pm.projects[key]
 }
 
 func (pm *ProjectManager) ListProjects() []*Project {

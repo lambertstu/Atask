@@ -58,7 +58,7 @@ func (l *UnblockSessionLogic) UnblockSession(req *types.UnblockRequest) (*types.
 		if err := l.svcCtx.SessionManager.Unblock(req.ID, req.Response); err != nil {
 			return nil, err
 		}
-		go RunAgent(l.svcCtx.Engine, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
+		go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
 	} else {
 		l.svcCtx.SessionManager.Transition(req.ID, session.StateCompleted)
 	}

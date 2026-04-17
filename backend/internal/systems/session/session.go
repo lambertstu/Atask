@@ -45,7 +45,6 @@ type SessionManager struct {
 	sessions    map[string]*Session
 	mu          sync.RWMutex
 	eventBus    *events.EventBus
-	workDir     string
 }
 
 func generateID() string {
@@ -54,7 +53,7 @@ func generateID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func NewSessionManager(projectPath string, eventBus *events.EventBus, workDir string) *SessionManager {
+func NewSessionManager(projectPath string, eventBus *events.EventBus) *SessionManager {
 	sessionsDir := filepath.Join(projectPath, ".sessions")
 	os.MkdirAll(sessionsDir, 0755)
 
@@ -62,19 +61,6 @@ func NewSessionManager(projectPath string, eventBus *events.EventBus, workDir st
 		sessionsDir: sessionsDir,
 		sessions:    make(map[string]*Session),
 		eventBus:    eventBus,
-		workDir:     workDir,
-	}
-	sm.loadAll()
-	return sm
-}
-
-func NewSessionManagerLegacy(projectPath string) *SessionManager {
-	sessionsDir := filepath.Join(projectPath, ".sessions")
-	os.MkdirAll(sessionsDir, 0755)
-
-	sm := &SessionManager{
-		sessionsDir: sessionsDir,
-		sessions:    make(map[string]*Session),
 	}
 	sm.loadAll()
 	return sm
@@ -94,7 +80,7 @@ func (sm *SessionManager) loadAll() {
 		ctx, cancel := context.WithCancel(context.Background())
 		session.Ctx = ctx
 		session.CancelFunc = cancel
-		session.PermissionMgr = security.NewPermissionManager("plan", sm.workDir)
+		session.PermissionMgr = security.NewPermissionManager("plan", session.ProjectPath)
 		session.BlockedResponse = make(chan PermissionDecision, 1)
 		sm.sessions[session.ID] = &session
 	}
@@ -113,7 +99,7 @@ func (sm *SessionManager) CreateSession(projectPath, model string) *Session {
 		State:           StatePending,
 		CreatedAt:       time.Now(),
 		Messages:        []openai.ChatCompletionMessage{},
-		PermissionMgr:   security.NewPermissionManager("plan", sm.workDir),
+		PermissionMgr:   security.NewPermissionManager("plan", projectPath),
 		BlockedResponse: make(chan PermissionDecision, 1),
 		Ctx:             ctx,
 		CancelFunc:      cancel,
@@ -157,6 +143,10 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 	session := sm.sessions[sessionID]
 	if session == nil {
 		return fmt.Errorf("session not found")
+	}
+
+	if session.State == StatePlanning || session.State == StateProcessing {
+		return fmt.Errorf("session is already running (state: %s), cannot submit new input", session.State)
 	}
 
 	session.Input = input

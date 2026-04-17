@@ -26,20 +26,37 @@ func NewSessionEmitter(eventBus *events.EventBus, sessionID string) *SessionEmit
 
 var _ engine.EventEmitter = (*SessionEmitter)(nil)
 
-func RunAgent(eng *engine.AgentEngine, sm *session.SessionManager, eb *events.EventBus, sess *session.Session) {
-	if eng == nil {
+func RunAgent(em *engine.EngineManager, sm *session.SessionManager, eb *events.EventBus, sess *session.Session) {
+	if em == nil {
 		eb.Publish(sess.ID, events.NewEvent(events.EventError, sess.ID, map[string]interface{}{
-			"error": "engine not initialized",
+			"error": "EngineManager not initialized",
+		}))
+		sm.CompleteSession(sess.ID)
+		return
+	}
+
+	engCtx := em.GetOrCreate(sess.ProjectPath)
+	if engCtx == nil || engCtx.Engine == nil {
+		eb.Publish(sess.ID, events.NewEvent(events.EventError, sess.ID, map[string]interface{}{
+			"error": "engine not initialized for project: " + sess.ProjectPath,
 		}))
 		return
 	}
+
 	emitter := NewSessionEmitter(eb, sess.ID)
-	_, err := eng.RunStream(sess.Ctx, sess.Messages, emitter, sess.ID)
+	updatedMessages, err := engCtx.Engine.RunStream(sess.Ctx, sess.Messages, emitter, sess.ID)
+
+	if len(updatedMessages) > 0 {
+		sm.UpdateMessages(sess.ID, updatedMessages)
+	}
+
 	if err != nil {
 		eb.Publish(sess.ID, events.NewEvent(events.EventError, sess.ID, map[string]interface{}{
 			"error": err.Error(),
 		}))
+		sm.CompleteSession(sess.ID)
 		return
 	}
+
 	sm.CompleteSession(sess.ID)
 }

@@ -11,7 +11,7 @@ import (
 func TestSessionManager_CreateAndLoad(t *testing.T) {
 	tempDir := t.TempDir()
 
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 	session := sm.CreateSession(tempDir, "glm-5")
 
 	assert.NotEmpty(t, session.ID)
@@ -31,17 +31,17 @@ func TestSessionManager_CreateAndLoad(t *testing.T) {
 func TestSessionManager_ListSessions(t *testing.T) {
 	tempDir := t.TempDir()
 
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 	sm.CreateSession(tempDir, "glm-5")
 	sm.CreateSession(tempDir, "glm-5")
 
-	list := sm.ListSessions(tempDir)
+	list := sm.ListSessions(filepath.Base(tempDir))
 	assert.Len(t, list, 2)
 }
 
 func TestSessionManager_SubmitInput(t *testing.T) {
 	tempDir := t.TempDir()
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 
 	session := sm.CreateSession(tempDir, "glm-5")
 
@@ -56,16 +56,23 @@ func TestSessionManager_SubmitInput(t *testing.T) {
 	assert.Equal(t, "hello world", updated.Messages[0].Content)
 
 	err = sm.SubmitInput(session.ID, "second input", "build")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "session is already running")
+
+	sm.CompleteSession(session.ID)
+
+	err = sm.SubmitInput(session.ID, "restart input", "build")
 	assert.NoError(t, err)
 
 	updated2 := sm.GetSession(session.ID)
 	assert.Equal(t, StateProcessing, updated2.State)
 	assert.Len(t, updated2.Messages, 2)
+	assert.Equal(t, "restart input", updated2.Messages[1].Content)
 }
 
 func TestSessionManager_Transition(t *testing.T) {
 	tempDir := t.TempDir()
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 
 	session := sm.CreateSession(tempDir, "glm-4")
 	assert.Equal(t, StatePending, session.State)
@@ -85,7 +92,7 @@ func TestSessionManager_Transition(t *testing.T) {
 
 func TestSessionManager_BlockUnblock(t *testing.T) {
 	tempDir := t.TempDir()
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 
 	session := sm.CreateSession(tempDir, "glm-4")
 	sm.Transition(session.ID, StatePlanning)
@@ -116,7 +123,7 @@ func TestSessionManager_BlockUnblock(t *testing.T) {
 
 func TestSessionManager_UpdateMessages(t *testing.T) {
 	tempDir := t.TempDir()
-	sm := NewSessionManagerLegacy(tempDir)
+	sm := NewSessionManager(tempDir, nil)
 
 	session := sm.CreateSession(tempDir, "glm-4")
 
@@ -131,4 +138,37 @@ func TestSessionManager_UpdateMessages(t *testing.T) {
 	updated := sm.GetSession(session.ID)
 	assert.Len(t, updated.Messages, 2)
 	assert.Equal(t, "hello", updated.Messages[1].Content)
+}
+
+func TestSessionManager_Lifecycle(t *testing.T) {
+	tempDir := t.TempDir()
+	sm := NewSessionManager(tempDir, nil)
+
+	session := sm.CreateSession(tempDir, "glm-5")
+	assert.Equal(t, StatePending, session.State)
+
+	err := sm.SubmitInput(session.ID, "test input", "plan")
+	assert.NoError(t, err)
+
+	runningSession := sm.GetSession(session.ID)
+	assert.Equal(t, StatePlanning, runningSession.State)
+	assert.Len(t, runningSession.Messages, 1)
+
+	err = sm.SubmitInput(session.ID, "another input", "plan")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "session is already running")
+
+	err = sm.CompleteSession(session.ID)
+	assert.NoError(t, err)
+
+	completedSession := sm.GetSession(session.ID)
+	assert.Equal(t, StateCompleted, completedSession.State)
+
+	err = sm.SubmitInput(session.ID, "restart input", "build")
+	assert.NoError(t, err)
+
+	restartedSession := sm.GetSession(session.ID)
+	assert.Equal(t, StateProcessing, restartedSession.State)
+	assert.Len(t, restartedSession.Messages, 2)
+	assert.Equal(t, "restart input", restartedSession.Messages[1].Content)
 }

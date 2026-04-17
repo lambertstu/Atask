@@ -11,6 +11,7 @@ import (
 
 	"agent-base/internal/config"
 	"agent-base/internal/svc"
+	"agent-base/internal/systems/project"
 	"agent-base/internal/systems/session"
 	"agent-base/pkg/events"
 
@@ -21,13 +22,21 @@ import (
 func setupTestSvcCtx(t *testing.T) (*svc.ServiceContext, *session.SessionManager, *events.EventBus) {
 	t.Helper()
 	tempDir := t.TempDir()
-	sm := session.NewSessionManagerLegacy(tempDir)
+	sm := session.NewSessionManager(tempDir, nil)
 	eb := events.NewEventBus()
+	pm := project.NewProjectManager(tempDir)
+	cfg := config.Config{
+		ProjectRoot:      tempDir,
+		Model:            "glm-5",
+		ContextThreshold: 50000,
+		BashTimeout:      120,
+	}
 	svcCtx := &svc.ServiceContext{
-		Config:         config.Config{WorkDir: tempDir},
+		Config:         cfg,
 		SessionManager: sm,
 		EventBus:       eb,
-		Engine:         nil,
+		EngineManager:  nil,
+		ProjectManager: pm,
 	}
 	return svcCtx, sm, eb
 }
