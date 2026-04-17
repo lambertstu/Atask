@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
+	"agent-base/internal/systems/session"
 	"agent-base/pkg/events"
-	"agent-base/pkg/security"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -19,6 +19,7 @@ func (e *AgentEngine) RunStream(
 	messages []openai.ChatCompletionMessage,
 	emitter EventEmitter,
 	sessionID string,
+	sessionMgr *session.SessionManager,
 ) ([]openai.ChatCompletionMessage, error) {
 	roundsSinceTodo := 0
 
@@ -90,6 +91,7 @@ func (e *AgentEngine) RunStream(
 
 		preparedExecFuncs := make([]func() string, len(assistantMessage.ToolCalls))
 
+		// 执行llm 返回的工具
 		for i, tc := range assistantMessage.ToolCalls {
 			index := i
 			toolCall := tc
@@ -100,6 +102,7 @@ func (e *AgentEngine) RunStream(
 				continue
 			}
 
+			// 权限校验
 			decision := e.permissionMgr.Check(toolCall.Function.Name, args)
 
 			var execFunc func() string
@@ -120,7 +123,7 @@ func (e *AgentEngine) RunStream(
 					return fmt.Sprintf("Permission denied: %s", reason)
 				}
 			} else if decision["behavior"] == "ask" {
-				if e.handleAskStream(ctx, toolCall.Function.Name, args, decision, emitter, sessionID) {
+				if e.handleAskStream(toolCall.Function.Name, args, decision, emitter, sessionID, sessionMgr) {
 					execFunc = func() string {
 						return e.executeToolStream(toolCall, args, emitter, sessionID)
 					}
@@ -226,12 +229,12 @@ func (e *AgentEngine) RunStream(
 }
 
 func (e *AgentEngine) handleAskStream(
-	ctx context.Context,
 	toolName string,
 	toolInput map[string]interface{},
 	decision map[string]interface{},
 	emitter EventEmitter,
 	sessionID string,
+	sessionMgr *session.SessionManager,
 ) bool {
 	if e.permissionMgr.IsBlockingMode() {
 		emitter.Emit(events.EventBlocked, map[string]interface{}{
@@ -242,38 +245,28 @@ func (e *AgentEngine) handleAskStream(
 			"blocked_on": "permission",
 		})
 
-		responseCh := make(chan security.BlockingResponse, 1)
-		blockingReq := security.BlockingRequest{
-			ToolName:   toolName,
-			ToolInput:  toolInput,
-			Decision:   decision,
-			ResponseCh: responseCh,
+		sessionMgr.SetBlocked(sessionID, "permission", toolName, toolInput)
+
+		sess := sessionMgr.GetSession(sessionID)
+		if sess == nil {
+			return false
 		}
 
-		if blockingChan := e.permissionMgr.GetBlockingChannel(); blockingChan != nil {
-			select {
-			case blockingChan <- blockingReq:
-			case <-ctx.Done():
-				return false
-			}
-
-			select {
-			case resp := <-responseCh:
-				if resp.Approved {
-					if resp.AddAllowed != "" {
-						e.permissionMgr.AddAllowedDir(resp.AddAllowed)
-					}
-					return true
+		select {
+		case <-sess.Ctx.Done():
+			return false
+		case res := <-sess.BlockedResponse:
+			if res.Approved {
+				if res.AddAllowed != "" {
+					e.permissionMgr.AddAllowedDir(res.AddAllowed)
 				}
-				return false
-			case <-ctx.Done():
-				return false
+				return true
 			}
+			return false
 		}
-		return false
 	}
 
-	return e.permissionMgr.HandleAsk(toolName, toolInput, decision)
+	return e.permissionMgr.AskUserREPL(toolName, toolInput, decision)
 }
 
 func (e *AgentEngine) executeToolStream(

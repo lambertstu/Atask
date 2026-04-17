@@ -4,6 +4,7 @@
 package logic
 
 import (
+	"agent-base/pkg/security"
 	"context"
 	"errors"
 	"time"
@@ -31,7 +32,7 @@ func NewSubmitInputLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Submi
 func (l *SubmitInputLogic) SubmitInput(req *types.SubmitInputRequest) (*types.SessionResponse, error) {
 	mode := req.Mode
 	if mode == "" {
-		mode = "plan"
+		mode = security.PlanMode
 	}
 
 	if err := l.svcCtx.SessionManager.SubmitInput(req.ID, req.Input, mode); err != nil {

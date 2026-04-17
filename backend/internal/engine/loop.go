@@ -85,7 +85,7 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 					return fmt.Sprintf("Permission denied: %s", reason)
 				}
 			} else if decision["behavior"] == "ask" {
-				if e.permissionMgr.HandleAsk(toolCall.Function.Name, args, decision) {
+				if e.permissionMgr.AskUserREPL(toolCall.Function.Name, args, decision) {
 					execFunc = func() string {
 						return e.executeTool(toolCall, args)
 					}

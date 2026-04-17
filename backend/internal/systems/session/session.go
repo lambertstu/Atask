@@ -33,6 +33,7 @@ type Session struct {
 	BlockedOn   string                         `json:"blocked_on,omitempty"`
 	BlockedTool string                         `json:"blocked_tool,omitempty"`
 	BlockedArgs map[string]interface{}         `json:"blocked_args,omitempty"`
+	Mode        string                         `json:"mode"`
 
 	PermissionMgr   *security.PermissionManager `json:"-"`
 	BlockedResponse chan PermissionDecision     `json:"-"`
@@ -80,8 +81,13 @@ func (sm *SessionManager) loadAll() {
 		ctx, cancel := context.WithCancel(context.Background())
 		session.Ctx = ctx
 		session.CancelFunc = cancel
-		session.PermissionMgr = security.NewPermissionManager("plan", session.ProjectPath)
+
+		pm := security.NewPermissionManager(security.PlanMode, session.ProjectPath)
+		blockingChan := make(chan security.BlockingRequest, 10)
+		pm.SetBlockingChannel(blockingChan)
+		session.PermissionMgr = pm
 		session.BlockedResponse = make(chan PermissionDecision, 1)
+
 		sm.sessions[session.ID] = &session
 	}
 }
@@ -92,14 +98,19 @@ func (sm *SessionManager) CreateSession(projectPath, model string) *Session {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	pm := security.NewPermissionManager(security.PlanMode, projectPath)
+	blockingChan := make(chan security.BlockingRequest, 10)
+	pm.SetBlockingChannel(blockingChan)
+
 	session := &Session{
 		ID:              generateID(),
 		ProjectPath:     projectPath,
 		Model:           model,
 		State:           StatePending,
+		Mode:            security.PlanMode,
 		CreatedAt:       time.Now(),
 		Messages:        []openai.ChatCompletionMessage{},
-		PermissionMgr:   security.NewPermissionManager("plan", projectPath),
+		PermissionMgr:   pm,
 		BlockedResponse: make(chan PermissionDecision, 1),
 		Ctx:             ctx,
 		CancelFunc:      cancel,
@@ -183,7 +194,7 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 	return nil
 }
 
-func (sm *SessionManager) Transition(sessionID string, newState SessionState) error {
+func (sm *SessionManager) Transition(sessionID string, newState SessionState, mode string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -197,6 +208,7 @@ func (sm *SessionManager) Transition(sessionID string, newState SessionState) er
 	}
 
 	oldState := session.State
+	session.Mode = mode
 	session.State = newState
 	sm.save(session)
 
@@ -244,7 +256,7 @@ func (sm *SessionManager) SetBlocked(sessionID, blockedOn, blockedTool string, b
 	return nil
 }
 
-func (sm *SessionManager) Unblock(sessionID, response string) error {
+func (sm *SessionManager) ClearBlockedState(sessionID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -252,16 +264,21 @@ func (sm *SessionManager) Unblock(sessionID, response string) error {
 	if session == nil {
 		return fmt.Errorf("session not found")
 	}
-	if session.State != StateBlocked {
-		return fmt.Errorf("session not in blocked state")
+
+	var sessionState SessionState
+	switch session.Mode {
+	case security.PlanMode:
+		sessionState = StatePlanning
+	case security.BuildMode:
+		sessionState = StateProcessing
 	}
 
-	session.Messages = append(session.Messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: response,
-	})
+	if err := ValidateTransition(session.State, sessionState); err != nil {
+		return err
+	}
+
 	oldState := session.State
-	session.State = StateProcessing
+	session.State = sessionState
 	session.BlockedOn = ""
 	session.BlockedTool = ""
 	session.BlockedArgs = nil
@@ -298,12 +315,6 @@ func (sm *SessionManager) save(session *Session) {
 	os.WriteFile(path, data, 0644)
 }
 
-func (sm *SessionManager) SetEventBus(eventBus *events.EventBus) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	sm.eventBus = eventBus
-}
-
 func (sm *SessionManager) CompleteSession(sessionID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -317,8 +328,16 @@ func (sm *SessionManager) CompleteSession(sessionID string) error {
 		return err
 	}
 
+	var sessionState SessionState
+	switch session.Mode {
+	case security.PlanMode:
+		sessionState = StatePlanning
+	case security.BuildMode:
+		sessionState = StateCompleted
+	}
+
 	oldState := session.State
-	session.State = StateCompleted
+	session.State = sessionState
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -373,11 +392,4 @@ func (sm *SessionManager) SubmitPermissionDecision(sessionID string, decision Pe
 	default:
 		return fmt.Errorf("blocked response channel full or closed")
 	}
-}
-
-func (sm *SessionManager) PublishEvent(sessionID string, eventType events.EventType, data map[string]interface{}) {
-	if sm.eventBus == nil {
-		return
-	}
-	sm.eventBus.Publish(sessionID, events.NewEvent(eventType, sessionID, data))
 }

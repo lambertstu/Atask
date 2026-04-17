@@ -4,6 +4,7 @@
 package logic
 
 import (
+	"agent-base/pkg/security"
 	"context"
 	"errors"
 	"time"
@@ -35,12 +36,12 @@ func (l *ApprovePlanLogic) ApprovePlan(req *types.ApprovePlanRequest) (*types.Se
 		return nil, errors.New("session not found")
 	}
 
-	if err := l.svcCtx.SessionManager.Transition(req.ID, session.StateProcessing); err != nil {
-		return nil, err
+	if sess.PermissionMgr != nil {
+		sess.PermissionMgr.SetMode(security.BuildMode)
 	}
 
-	if sess.PermissionMgr != nil {
-		sess.PermissionMgr.SetMode("build")
+	if err := l.svcCtx.SessionManager.Transition(req.ID, session.StateProcessing, security.BuildMode); err != nil {
+		return nil, err
 	}
 
 	go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)

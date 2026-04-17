@@ -107,18 +107,20 @@ func TestSessionManager_BlockUnblock(t *testing.T) {
 	assert.Equal(t, "shell", updated.BlockedTool)
 	assert.Equal(t, blockedArgs, updated.BlockedArgs)
 
-	err = sm.Unblock(session.ID, "user approved")
+	decision := PermissionDecision{Approved: true}
+	err = sm.SubmitPermissionDecision(session.ID, decision)
 	assert.NoError(t, err)
 
+	select {
+	case res := <-session.BlockedResponse:
+		assert.True(t, res.Approved)
+	default:
+		t.Fatal("expected decision in channel")
+	}
+
+	sm.Transition(session.ID, StateProcessing)
 	unblocked := sm.GetSession(session.ID)
 	assert.Equal(t, StateProcessing, unblocked.State)
-	assert.Empty(t, unblocked.BlockedOn)
-	assert.Empty(t, unblocked.BlockedTool)
-	assert.Nil(t, unblocked.BlockedArgs)
-
-	assert.Len(t, unblocked.Messages, 1)
-	assert.Equal(t, openai.ChatMessageRoleUser, unblocked.Messages[0].Role)
-	assert.Equal(t, "user approved", unblocked.Messages[0].Content)
 }
 
 func TestSessionManager_UpdateMessages(t *testing.T) {
@@ -171,4 +173,38 @@ func TestSessionManager_Lifecycle(t *testing.T) {
 	assert.Equal(t, StateProcessing, restartedSession.State)
 	assert.Len(t, restartedSession.Messages, 2)
 	assert.Equal(t, "restart input", restartedSession.Messages[1].Content)
+}
+
+func TestSessionManager_PermissionMgrBlockingChannel(t *testing.T) {
+	tempDir := t.TempDir()
+	sm := NewSessionManager(tempDir, nil)
+
+	session := sm.CreateSession(tempDir, "glm-5")
+
+	assert.NotNil(t, session.PermissionMgr)
+	assert.True(t, session.PermissionMgr.IsBlockingMode())
+	assert.NotNil(t, session.PermissionMgr.GetBlockingChannel())
+
+	assert.NotNil(t, session.BlockedResponse)
+}
+
+func TestSessionManager_LoadAllWithBlockingChannel(t *testing.T) {
+	tempDir := t.TempDir()
+	sm := NewSessionManager(tempDir, nil)
+
+	session1 := sm.CreateSession(tempDir, "glm-5")
+	session2 := sm.CreateSession(tempDir, "glm-4")
+
+	assert.True(t, session1.PermissionMgr.IsBlockingMode())
+	assert.True(t, session2.PermissionMgr.IsBlockingMode())
+
+	sm2 := NewSessionManager(tempDir, nil)
+
+	loaded1 := sm2.GetSession(session1.ID)
+	loaded2 := sm2.GetSession(session2.ID)
+
+	assert.NotNil(t, loaded1)
+	assert.NotNil(t, loaded2)
+	assert.True(t, loaded1.PermissionMgr.IsBlockingMode())
+	assert.True(t, loaded2.PermissionMgr.IsBlockingMode())
 }

@@ -96,3 +96,26 @@ func TestCompactTool(t *testing.T) {
 	result := tool.Execute(context.Background(), map[string]interface{}{})
 	assert.Contains(t, result, "Compact")
 }
+
+func TestAgentEngine_SetPermissionManager(t *testing.T) {
+	tempDir := testutil.NewTempDir(t)
+	defer tempDir.Cleanup()
+
+	mockLLM := testutil.NewMockLLMClient()
+	registry := tools.NewDefaultRegistry()
+	hm := events.NewHookManager(tempDir.Path)
+	builder := NewSystemPromptBuilder(tempDir.Path, tempDir.Path, "test-model")
+	cm := NewContextManager(mockLLM, "test-model", tempDir.Path, 50000)
+	rm := NewRecoveryManager(mockLLM, "test-model", cm, builder)
+
+	engine := NewAgentEngine(mockLLM, registry, nil, hm, builder, cm, rm, "test-model", 50000)
+	assert.NotNil(t, engine)
+
+	pm := security.NewPermissionManager("plan", tempDir.Path)
+	engine.SetPermissionManager(pm)
+
+	assert.NotNil(t, engine.permissionMgr)
+	decision := engine.permissionMgr.Check("test_tool", map[string]interface{}{})
+	assert.NotNil(t, decision)
+	assert.Contains(t, decision, "behavior")
+}

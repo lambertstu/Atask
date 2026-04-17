@@ -10,9 +10,14 @@ import (
 	"agent-base/pkg/utils"
 )
 
+const (
+	PlanMode  = "plan"
+	BuildMode = "build"
+)
+
 const TrustMarker = ".claude/.claude_trusted"
 
-var Modes = []string{"plan", "build"}
+var Modes = []string{PlanMode, BuildMode}
 
 var ReadOnlyTools = map[string]bool{
 	"read_file":    true,
@@ -134,7 +139,7 @@ type PermissionManager struct {
 
 func NewPermissionManager(mode string, workDir string) *PermissionManager {
 	if !utils.Contains(Modes, mode) {
-		mode = "plan"
+		mode = PlanMode
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)
@@ -205,37 +210,7 @@ func (p *PermissionManager) AskUser(toolName string, toolInput map[string]interf
 	return false
 }
 
-func (p *PermissionManager) HandleAsk(toolName string, toolInput map[string]interface{}, decision map[string]interface{}) bool {
-	if p.blockingChan != nil {
-		responseCh := make(chan BlockingResponse, 1)
-		p.blockingChan <- BlockingRequest{
-			ToolName:   toolName,
-			ToolInput:  toolInput,
-			Decision:   decision,
-			ResponseCh: responseCh,
-		}
-
-		select {
-		case resp := <-responseCh:
-			if resp.Approved {
-				if resp.AddAllowed != "" {
-					p.AddAllowedDir(resp.AddAllowed)
-				}
-				p.consecutiveDenials = 0
-				return true
-			}
-			p.consecutiveDenials++
-			return false
-		default:
-			return false
-		}
-	}
-
-	if p.blockedCallback != nil {
-		p.blockedCallback(toolName, toolInput)
-		return false
-	}
-
+func (p *PermissionManager) AskUserREPL(toolName string, toolInput map[string]interface{}, decision map[string]interface{}) bool {
 	if decision["needs_path_auth"] == true {
 		requestedPath := decision["requested_path"].(string)
 		requestedDir := filepath.Dir(requestedPath)

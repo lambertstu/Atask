@@ -14,7 +14,7 @@ const (
 
 var ValidTransitions = map[SessionState][]SessionState{
 	StatePending:    {StatePlanning, StateProcessing},
-	StatePlanning:   {StateProcessing, StateBlocked, StateCompleted, StatePlanning},
+	StatePlanning:   {StateProcessing, StateBlocked, StatePending},
 	StateProcessing: {StateBlocked, StateCompleted, StatePlanning, StateProcessing},
 	StateBlocked:    {StateProcessing, StateCompleted, StatePlanning},
 	StateCompleted:  {StatePlanning, StateProcessing},

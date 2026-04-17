@@ -66,6 +66,10 @@ func NewAgentEngine(
 	}
 }
 
+func (e *AgentEngine) SetPermissionManager(pm *security.PermissionManager) {
+	e.permissionMgr = pm
+}
+
 type CompactTool struct{}
 
 func NewCompactTool() tools.Tool {

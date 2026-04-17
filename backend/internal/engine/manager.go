@@ -11,7 +11,6 @@ import (
 	"agent-base/internal/tools/builtin"
 	"agent-base/internal/tools/planning"
 	"agent-base/pkg/events"
-	"agent-base/pkg/security"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -20,7 +19,6 @@ import (
 type EngineContext struct {
 	Engine         *AgentEngine
 	Registry       *tools.DefaultRegistry
-	PermissionMgr  *security.PermissionManager
 	HookMgr        *events.HookManager
 	PromptBuilder  *SystemPromptBuilder
 	ContextMgr     *ContextManagerImpl
@@ -118,7 +116,6 @@ func (em *EngineManager) createEngineContext(workDir string) *EngineContext {
 
 	registry.Register(NewCompactTool())
 
-	permissionMgr := security.NewPermissionManager("plan", workDir)
 	hookMgr := events.NewHookManager(workDir)
 
 	promptBuilder := NewSystemPromptBuilder(workDir, em.projectRoot, em.config.Model)
@@ -128,7 +125,7 @@ func (em *EngineManager) createEngineContext(workDir string) *EngineContext {
 	agentEngine := NewAgentEngine(
 		em.llmClient,
 		registry,
-		permissionMgr,
+		nil,
 		hookMgr,
 		promptBuilder,
 		contextMgr,
@@ -143,7 +140,6 @@ func (em *EngineManager) createEngineContext(workDir string) *EngineContext {
 	return &EngineContext{
 		Engine:         agentEngine,
 		Registry:       registry,
-		PermissionMgr:  permissionMgr,
 		HookMgr:        hookMgr,
 		PromptBuilder:  promptBuilder,
 		ContextMgr:     contextMgr,

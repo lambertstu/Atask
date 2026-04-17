@@ -11,7 +11,6 @@ import (
 	"agent-base/internal/svc"
 	"agent-base/internal/systems/session"
 	"agent-base/internal/types"
-	"agent-base/pkg/security"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -40,27 +39,17 @@ func (l *UnblockSessionLogic) UnblockSession(req *types.UnblockRequest) (*types.
 		return nil, errors.New("session not in blocked state")
 	}
 
-	if sess.PermissionMgr != nil && sess.PermissionMgr.IsBlockingMode() {
-		blockingChan := sess.PermissionMgr.GetBlockingChannel()
-		if blockingChan != nil {
-			select {
-			case pendingReq := <-blockingChan:
-				pendingReq.ResponseCh <- security.BlockingResponse{
-					Approved:   req.Approved,
-					AddAllowed: req.AddAllowed,
-				}
-			default:
-			}
-		}
+	decision := session.PermissionDecision{
+		Approved:   req.Approved,
+		AddAllowed: req.AddAllowed,
 	}
 
-	if req.Approved {
-		if err := l.svcCtx.SessionManager.Unblock(req.ID, req.Response); err != nil {
-			return nil, err
-		}
-		go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
-	} else {
-		l.svcCtx.SessionManager.Transition(req.ID, session.StateCompleted)
+	if err := l.svcCtx.SessionManager.ClearBlockedState(req.ID); err != nil {
+		return nil, err
+	}
+
+	if err := l.svcCtx.SessionManager.SubmitPermissionDecision(req.ID, decision); err != nil {
+		return nil, err
 	}
 
 	sess = l.svcCtx.SessionManager.GetSession(req.ID)
