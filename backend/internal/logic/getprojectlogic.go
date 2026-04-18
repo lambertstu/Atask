@@ -6,6 +6,7 @@ package logic
 import (
 	"context"
 	"errors"
+	"time"
 
 	"agent-base/internal/svc"
 	"agent-base/internal/types"
@@ -34,7 +35,8 @@ func (l *GetProjectLogic) GetProject(req *types.GetProjectRequest) (resp *types.
 	}
 
 	return &types.ProjectResponse{
-		Path:     p.Path,
-		Sessions: p.Sessions,
+		Path:         p.Path,
+		Sessions:     p.Sessions,
+		LastModified: p.LastModified.Format(time.RFC3339),
 	}, nil
 }

@@ -1,0 +1,29 @@
+name: atask_board
+description: "Atask Agent Board - Trello-style interface for AI Agent interactions"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  provider: ^6.1.2
+  dio: ^5.7.0
+  flutter_markdown: ^0.7.4+3
+  web: ^1.1.1
+  path_provider: ^2.1.3
+  file_picker: ^8.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - lib/assets/logo.png

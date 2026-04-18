@@ -5,6 +5,7 @@ package logic
 
 import (
 	"context"
+	"time"
 
 	"agent-base/internal/svc"
 	"agent-base/internal/types"
@@ -27,10 +28,11 @@ func NewCreateProjectLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Cre
 }
 
 func (l *CreateProjectLogic) CreateProject(req *types.CreateProjectRequest) (resp *types.ProjectResponse, err error) {
-	p := l.svcCtx.ProjectManager.GetOrCreate(req.Path)
+	p := l.svcCtx.ProjectManager.OpenProject(req.Path)
 
 	return &types.ProjectResponse{
-		Path:     p.Path,
-		Sessions: p.Sessions,
+		Path:         p.Path,
+		Sessions:     p.Sessions,
+		LastModified: p.LastModified.Format(time.RFC3339),
 	}, nil
 }

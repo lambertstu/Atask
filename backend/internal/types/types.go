@@ -46,8 +46,9 @@ type ProjectListResponse struct {
 }
 
 type ProjectResponse struct {
-	Path     string   `json:"path"`
-	Sessions []string `json:"sessions"`
+	Path         string   `json:"path"`
+	Sessions     []string `json:"sessions"`
+	LastModified string   `json:"last_modified"`
 }
 
 type SessionEvent struct {

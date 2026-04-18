@@ -154,7 +154,7 @@ func TestUnblockSession(t *testing.T) {
 	svcCtx, sm, _ := setupTestSvcCtx(t)
 	sess := sm.CreateSession("/tmp/test", "glm-5")
 	sm.SubmitInput(sess.ID, "test input", "plan")
-	sm.Transition(sess.ID, session.StateProcessing)
+	sm.Transition(sess.ID, session.StateProcessing, "build")
 	sm.SetBlocked(sess.ID, "waiting", "shell", map[string]interface{}{"cmd": "ls"})
 	t.Run("unblock with approval", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]interface{}{"response": "ok", "approved": true})

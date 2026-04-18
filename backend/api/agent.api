@@ -75,8 +75,9 @@ type (
 		Error string `json:"error"`
 	}
 	ProjectResponse {
-		Path     string   `json:"path"`
-		Sessions []string `json:"sessions"`
+		Path         string   `json:"path"`
+		Sessions     []string `json:"sessions"`
+		LastModified string   `json:"last_modified"`
 	}
 	ProjectListResponse {
 		Projects []ProjectResponse `json:"projects"`

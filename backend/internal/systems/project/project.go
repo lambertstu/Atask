@@ -5,16 +5,21 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"sync"
+	"time"
 )
 
 type Project struct {
-	Path     string   `json:"path"`
-	Sessions []string `json:"sessions"`
+	Path         string    `json:"path"`
+	Sessions     []string  `json:"sessions"`
+	LastModified time.Time `json:"last_modified"`
 }
 
 type ProjectManager struct {
 	configFile string
 	projects   map[string]*Project
+	mu         sync.RWMutex
 }
 
 func NewProjectManager(projectRoot string) *ProjectManager {
@@ -50,29 +55,62 @@ func (pm *ProjectManager) load() {
 	}
 	if container.Projects != nil {
 		pm.projects = container.Projects
+		for _, p := range pm.projects {
+			if p.LastModified.IsZero() {
+				p.LastModified = time.Now()
+			}
+		}
 	}
 }
 
 func (pm *ProjectManager) save() {
+	pm.mu.RLock()
 	container := struct {
 		Projects map[string]*Project `json:"projects"`
 	}{
 		Projects: pm.projects,
 	}
+	pm.mu.RUnlock()
+
 	data, _ := json.MarshalIndent(container, "", "  ")
 	os.MkdirAll(filepath.Dir(pm.configFile), 0755)
 	os.WriteFile(pm.configFile, data, 0644)
 }
 
 func (pm *ProjectManager) GetOrCreate(path string) *Project {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
 	key := filepath.Base(path)
 	if project, exists := pm.projects[key]; exists {
 		return project
 	}
 
 	project := &Project{
-		Path:     path,
-		Sessions: []string{},
+		Path:         path,
+		Sessions:     []string{},
+		LastModified: time.Now(),
+	}
+	pm.projects[key] = project
+	pm.save()
+	return project
+}
+
+func (pm *ProjectManager) OpenProject(path string) *Project {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	key := filepath.Base(path)
+	if project, exists := pm.projects[key]; exists {
+		project.LastModified = time.Now()
+		pm.save()
+		return project
+	}
+
+	project := &Project{
+		Path:         path,
+		Sessions:     []string{},
+		LastModified: time.Now(),
 	}
 	pm.projects[key] = project
 	pm.save()
@@ -80,25 +118,48 @@ func (pm *ProjectManager) GetOrCreate(path string) *Project {
 }
 
 func (pm *ProjectManager) AddSession(projectPath, sessionID string) {
-	project := pm.GetOrCreate(projectPath)
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	key := filepath.Base(projectPath)
+	project, exists := pm.projects[key]
+	if !exists {
+		project = &Project{
+			Path:         projectPath,
+			Sessions:     []string{},
+			LastModified: time.Now(),
+		}
+		pm.projects[key] = project
+	}
+
 	for _, id := range project.Sessions {
 		if id == sessionID {
 			return
 		}
 	}
 	project.Sessions = append(project.Sessions, sessionID)
+	project.LastModified = time.Now()
 	pm.save()
 }
 
 func (pm *ProjectManager) GetProject(path string) *Project {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
 	key := filepath.Base(path)
 	return pm.projects[key]
 }
 
 func (pm *ProjectManager) ListProjects() []*Project {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
 	var list []*Project
 	for _, p := range pm.projects {
 		list = append(list, p)
 	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].LastModified.After(list[j].LastModified)
+	})
 	return list
 }

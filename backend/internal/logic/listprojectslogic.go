@@ -5,6 +5,7 @@ package logic
 
 import (
 	"context"
+	"time"
 
 	"agent-base/internal/svc"
 	"agent-base/internal/types"
@@ -32,8 +33,9 @@ func (l *ListProjectsLogic) ListProjects() (resp *types.ProjectListResponse, err
 	result := make([]types.ProjectResponse, len(projects))
 	for i, p := range projects {
 		result[i] = types.ProjectResponse{
-			Path:     p.Path,
-			Sessions: p.Sessions,
+			Path:         p.Path,
+			Sessions:     p.Sessions,
+			LastModified: p.LastModified.Format(time.RFC3339),
 		}
 	}
 
