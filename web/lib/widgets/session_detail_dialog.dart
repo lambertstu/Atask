@@ -23,6 +23,10 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
   late String _currentModel;
   bool _isSubmitting = false;
   bool _hasSubscribedToSse = false;
+  
+  bool _isUserAtBottom = true;
+  int _unreadMessageCount = 0;
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
@@ -30,6 +34,9 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
     final session = _getCurrentSession();
     _currentMode = session?.mode ?? SessionMode.plan;
     _currentModel = session?.model ?? 'glm-5';
+    _lastMessageCount = session?.messages.length ?? 0;
+
+    _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final session = _getCurrentSession();
@@ -45,6 +52,39 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      final isAtBottom = (maxScroll - currentScroll) < 100;
+      
+      if (isAtBottom && !_isUserAtBottom) {
+        setState(() {
+          _isUserAtBottom = true;
+          _unreadMessageCount = 0;
+        });
+      } else if (!isAtBottom && _isUserAtBottom) {
+        setState(() {
+          _isUserAtBottom = false;
+        });
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+      setState(() {
+        _isUserAtBottom = true;
+        _unreadMessageCount = 0;
+      });
+    }
   }
 
   @override
@@ -216,6 +256,23 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
         final processedMessages = _processMessages(session.messages);
         final isRunning = session.state == SessionState.processing ||
             session.state == SessionState.planning;
+        
+        final newCount = processedMessages.length;
+        if (newCount > _lastMessageCount) {
+          final addedCount = newCount - _lastMessageCount;
+          if (_isUserAtBottom) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToBottom();
+            });
+          } else {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() {
+                _unreadMessageCount += addedCount;
+              });
+            });
+          }
+          _lastMessageCount = newCount;
+        }
 
         return AlertDialog(
           title: Row(
@@ -310,17 +367,81 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
                             style: TextStyle(color: Colors.grey[400]),
                           ),
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          itemCount: processedMessages.length,
-                          itemBuilder: (context, index) {
-                            final item = processedMessages[index];
-                            return MessageBubble(
-                              message: item.message,
-                              toolResults: item.toolResults,
-                            );
-                          },
+                      : Stack(
+                          children: [
+                            ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              itemCount: processedMessages.length,
+                              itemBuilder: (context, index) {
+                                final item = processedMessages[index];
+                                return MessageBubble(
+                                  message: item.message,
+                                  toolResults: item.toolResults,
+                                );
+                              },
+                            ),
+                            if (_unreadMessageCount > 0)
+                              Positioned(
+                                top: 16,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: GestureDetector(
+                                    onTap: _scrollToBottom,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF8B5CF6),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        '$_unreadMessageCount 条新消息',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (!_isUserAtBottom && _scrollController.hasClients && 
+                                _scrollController.position.maxScrollExtent > 0)
+                              Positioned(
+                                bottom: 16,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: GestureDetector(
+                                    onTap: _scrollToBottom,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(24),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withAlpha(30),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_downward,
+                                        size: 20,
+                                        color: Color(0xFF8B5CF6),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                 ),
                 const SizedBox(height: 12),
@@ -632,6 +753,43 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
                         }
                       },
               ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              tooltip: 'Delete Session',
+              style: IconButton.styleFrom(
+                foregroundColor: Colors.red[400],
+                minimumSize: const Size(32, 32),
+              ),
+              onPressed: (_isSubmitting || isRunning)
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete Session'),
+                          content: const Text(
+                              'Are you sure you want to delete this session?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await provider.removeSession(session.id);
+                        if (context.mounted) Navigator.pop(context);
+                      }
+                    },
             ),
             const Spacer(),
             TextButton(

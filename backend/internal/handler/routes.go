@@ -17,6 +17,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 		[]rest.Route{
 			{
 				Method:  http.MethodGet,
+				Path:    "/config/llm",
+				Handler: GetLLMConfigHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPut,
+				Path:    "/config/llm",
+				Handler: UpdateLLMConfigHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
 				Path:    "/projects",
 				Handler: ListProjectsHandler(serverCtx),
 			},

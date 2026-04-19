@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../models/session.dart';
 import '../models/project.dart';
+import '../models/llm_config.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -132,6 +133,26 @@ class ApiService {
       return Session.fromJson(resp.data);
     } on DioException catch (e) {
       throw ApiException(e.message ?? 'Failed to unblock', statusCode: e.response?.statusCode);
+    }
+  }
+
+  // ============ LLM Config APIs ============
+
+  Future<LLMConfig> getLLMConfig() async {
+    try {
+      final resp = await _dio.get('/api/config/llm');
+      return LLMConfig.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to get LLM config', statusCode: e.response?.statusCode);
+    }
+  }
+
+  Future<LLMConfig> updateLLMConfig(LLMConfig config) async {
+    try {
+      final resp = await _dio.put('/api/config/llm', data: config.toJson());
+      return LLMConfig.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to update LLM config', statusCode: e.response?.statusCode);
     }
   }
 }

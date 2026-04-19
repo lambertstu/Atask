@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/session_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/session.dart';
 import '../models/project.dart';
 import '../widgets/session_card.dart';
 import '../widgets/session_detail_dialog.dart';
+import '../widgets/llm_config_dialog.dart';
 
 class BoardScreen extends StatelessWidget {
   const BoardScreen({super.key});
@@ -74,6 +77,7 @@ class BoardScreen extends StatelessWidget {
           _buildOpenProjectButton(context),
           const SizedBox(height: 16),
           _buildProjectList(context, provider),
+          _buildSettingsButton(context),
         ],
       ),
     );
@@ -189,7 +193,7 @@ class BoardScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: OutlinedButton.icon(
         icon: const Icon(Icons.folder_open, size: 18),
-        label: const Text('打开项目'),
+        label: const Text('open project'),
         style: OutlinedButton.styleFrom(
           foregroundColor: const Color(0xFF8B5CF6),
           side: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -414,43 +418,29 @@ class BoardScreen extends StatelessWidget {
     );
   }
 
-  void _showOpenProjectDialog(BuildContext context) {
-    String path = '';
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('打开项目'),
-          content: TextField(
-            decoration: const InputDecoration(
-              labelText: '项目路径',
-              hintText: '输入项目名称或路径',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (value) => path = value,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (path.isNotEmpty) {
-                  context.read<SessionProvider>().createProject(path);
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('打开'),
-            ),
-          ],
-        );
-      },
+  Future<void> _showOpenProjectDialog(BuildContext context) async {
+    final selectedPath = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: '选择项目目录',
     );
+
+    if (selectedPath == null) return;
+
+    if (!context.mounted) return;
+
+    try {
+      await context.read<SessionProvider>().createProject(selectedPath);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('项目已打开: ${selectedPath.split('/').last}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('打开项目失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _createSessionDirectly(BuildContext context) async {
@@ -488,6 +478,41 @@ class BoardScreen extends StatelessWidget {
       context: context,
       builder: (context) {
         return SessionDetailDialog(sessionId: session.id);
+      },
+    );
+  }
+
+  Widget _buildSettingsButton(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      child: InkWell(
+        onTap: () => _showLLMConfigDialog(context),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.settings, size: 20, color: Colors.grey[600]),
+              const SizedBox(width: 12),
+              Text(
+                'Settings',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLLMConfigDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: const LLMConfigDialog(),
+        );
       },
     );
   }

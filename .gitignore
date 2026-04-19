@@ -26,3 +26,12 @@
 .claude/
 agent-transcripts/
 terminals/
+
+# Flutter Desktop
+web/macos/
+web/windows/
+web/linux/
+web/.metadata
+
+# PlantUML
+*.puml

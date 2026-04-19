@@ -41,6 +41,20 @@ type GetSessionRequest struct {
 	ID string `path:"id"`
 }
 
+type LLMConfigRequest struct {
+	APIKey  string `json:"api_key,optional"`
+	BaseURL string `json:"base_url,optional"`
+	Model   string `json:"model,optional"`
+}
+
+type LLMConfigResponse struct {
+	APIKey    string `json:"api_key"`
+	BaseURL   string `json:"base_url"`
+	Model     string `json:"model"`
+	HasAPIKey bool   `json:"has_api_key"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 type ProjectListResponse struct {
 	Projects []ProjectResponse `json:"projects"`
 }

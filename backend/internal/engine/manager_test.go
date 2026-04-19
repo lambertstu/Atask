@@ -23,7 +23,7 @@ func TestEngineManager_GetOrCreate(t *testing.T) {
 		BaseURL:          "https://test.example.com/v1",
 	}
 
-	llmClient := llm.NewClient(&cfg)
+	llmClient := llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 	em := NewEngineManager(cfg, llmClient)
 
 	engCtx := em.GetOrCreate(tempDir.Path)
@@ -49,7 +49,7 @@ func TestEngineManager_GetOrCreate_Cached(t *testing.T) {
 		BaseURL:          "https://test.example.com/v1",
 	}
 
-	llmClient := llm.NewClient(&cfg)
+	llmClient := llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 	em := NewEngineManager(cfg, llmClient)
 
 	engCtx1 := em.GetOrCreate(tempDir.Path)
@@ -71,7 +71,7 @@ func TestEngineManager_Get(t *testing.T) {
 		BaseURL:          "https://test.example.com/v1",
 	}
 
-	llmClient := llm.NewClient(&cfg)
+	llmClient := llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 	em := NewEngineManager(cfg, llmClient)
 
 	engCtx, exists := em.Get(tempDir.Path)

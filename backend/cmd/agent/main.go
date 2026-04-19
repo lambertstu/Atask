@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	llmClient := llm.NewClient(cfg)
+	llmClient := llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 
 	registry := tools.NewDefaultRegistry()
 

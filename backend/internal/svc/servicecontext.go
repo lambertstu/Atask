@@ -18,10 +18,15 @@ type ServiceContext struct {
 	EngineManager  *engine.EngineManager
 	EventBus       *events.EventBus
 	ProjectManager *project.ProjectManager
+	LLMConfigMgr   *config.LLMConfigManager
+	LLMClient      *llm.DashScopeClient
 }
 
 func NewServiceContext(cfg config.Config) *ServiceContext {
-	llmClient := llm.NewClient(&cfg)
+	llmConfigMgr := config.NewLLMConfigManager(cfg.ProjectRoot, cfg.APIKey, cfg.BaseURL, cfg.Model)
+
+	llmCfg := llmConfigMgr.Get()
+	llmClient := llm.NewClient(llmCfg.APIKey, llmCfg.BaseURL, llmCfg.Model)
 
 	eventBus := events.NewEventBus()
 
@@ -37,5 +42,7 @@ func NewServiceContext(cfg config.Config) *ServiceContext {
 		EngineManager:  engineManager,
 		EventBus:       eventBus,
 		ProjectManager: projectManager,
+		LLMConfigMgr:   llmConfigMgr,
+		LLMClient:      llmClient,
 	}
 }

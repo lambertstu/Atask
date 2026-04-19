@@ -5,6 +5,7 @@ package logic
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"agent-base/internal/svc"
@@ -42,6 +43,10 @@ func (l *ListSessionsLogic) ListSessions(req *types.SessionListRequest) (resp *t
 	if sessions == nil {
 		return &types.SessionListResponse{Sessions: nil}, nil
 	}
+
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].CreatedAt.After(sessions[j].CreatedAt)
+	})
 
 	var list []types.SessionResponse
 	for _, s := range sessions {

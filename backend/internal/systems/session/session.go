@@ -187,6 +187,7 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 	session.Mode = mode
 	session.PermissionMgr.SetMode(mode)
 	session.State = newState
+	session.CreatedAt = time.Now()
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -216,6 +217,7 @@ func (sm *SessionManager) Transition(sessionID string, newState SessionState, mo
 	oldState := session.State
 	session.Mode = mode
 	session.State = newState
+	session.CreatedAt = time.Now()
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -247,6 +249,7 @@ func (sm *SessionManager) SetBlocked(sessionID, blockedOn, blockedTool string, b
 	session.BlockedOn = blockedOn
 	session.BlockedTool = blockedTool
 	session.BlockedArgs = blockedArgs
+	session.CreatedAt = time.Now()
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -288,6 +291,7 @@ func (sm *SessionManager) ClearBlockedState(sessionID string) error {
 	session.BlockedOn = ""
 	session.BlockedTool = ""
 	session.BlockedArgs = nil
+	session.CreatedAt = time.Now()
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -322,6 +326,7 @@ func (sm *SessionManager) UpdateMessages(sessionID string, messages []openai.Cha
 		filtered = append(filtered, msg)
 	}
 	session.Messages = filtered
+	session.CreatedAt = time.Now()
 	sm.save(session)
 	return nil
 }
@@ -408,6 +413,7 @@ func (sm *SessionManager) CompleteSession(sessionID string) error {
 
 	oldState := session.State
 	session.State = StateCompleted
+	session.CreatedAt = time.Now()
 	sm.save(session)
 
 	if sm.eventBus != nil {

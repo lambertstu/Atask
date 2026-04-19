@@ -74,7 +74,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 color: const Color(0xFF3B82F6),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Text(
+              child: SelectableText(
                 content,
                 style: const TextStyle(color: Colors.white),
               ),
@@ -112,54 +112,60 @@ class _MessageBubbleState extends State<MessageBubble> {
           const SizedBox(width: 8),
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              padding: const EdgeInsets.only(top: 12, bottom: 12, left: 16, right: 16),
               decoration: BoxDecoration(
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  if (content.isNotEmpty)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        InkWell(
-                          onTap: () => _copyMessage(context),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.copy,
-                              size: 16,
-                              color: Colors.grey[600],
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (content.isNotEmpty)
+                        SelectionArea(
+                          child: MarkdownBody(
+                            data: content,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(color: Colors.grey[800]),
+                              code: TextStyle(
+                                backgroundColor: Colors.grey[300],
+                                color: Colors.grey[800],
+                              ),
+                              codeblockPadding: const EdgeInsets.all(8),
+                              codeblockDecoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      if (widget.message.reasoningContent != null &&
+                          widget.message.reasoningContent!.isNotEmpty)
+                        _buildReasoningSection(),
+                      if (widget.message.toolCalls != null &&
+                          widget.message.toolCalls!.isNotEmpty)
+                        _buildToolCallsSection(),
+                    ],
+                  ),
                   if (content.isNotEmpty)
-                    MarkdownBody(
-                      data: content,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(color: Colors.grey[800]),
-                        code: TextStyle(
-                          backgroundColor: Colors.grey[300],
-                          color: Colors.grey[800],
-                        ),
-                        codeblockPadding: const EdgeInsets.all(8),
-                        codeblockDecoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8),
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: InkWell(
+                        onTap: () => _copyMessage(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.copy,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                     ),
-                  if (widget.message.reasoningContent != null &&
-                      widget.message.reasoningContent!.isNotEmpty)
-                    _buildReasoningSection(),
-                  if (widget.message.toolCalls != null &&
-                      widget.message.toolCalls!.isNotEmpty)
-                    _buildToolCallsSection(),
                 ],
               ),
             ),

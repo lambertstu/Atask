@@ -4,8 +4,10 @@ Port: 8888
 Model: glm-5
 # WorkDir is now optional for REST API mode - each session uses its own project_path as workDir
 WorkDir:
-ProjectRoot: /Users/libing/gitProject/Atask
-APIKey: sk-sp-3fec10ad9d2e4db69b8eb39ca2f470cc
-BaseURL: "https://coding.dashscope.aliyuncs.com/v1"
+ProjectRoot: /Users/libing/.config/Atask
+APIKey: ""
+BaseURL: ""
 ContextThreshold: 50000
 BashTimeout: 120
+# CORS configuration for Flutter Web
+AllowOrigins: ["*"]
