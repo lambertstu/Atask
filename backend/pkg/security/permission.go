@@ -260,9 +260,20 @@ func (p *PermissionManager) matchesRule(rule PermissionRule, toolName string, to
 }
 
 func (p *PermissionManager) isPathAllowed(path string) bool {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return false
+	var absPath string
+
+	if filepath.IsAbs(path) {
+		absPath = filepath.Clean(path)
+	} else {
+		if p.workDir != "" {
+			absPath = filepath.Join(p.workDir, path)
+		} else {
+			var err error
+			absPath, err = filepath.Abs(path)
+			if err != nil {
+				return false
+			}
+		}
 	}
 
 	// 优先检查工作目录（自动授权）

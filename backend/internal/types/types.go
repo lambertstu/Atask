@@ -51,6 +51,11 @@ type ProjectResponse struct {
 	LastModified string   `json:"last_modified"`
 }
 
+type RemoveSessionFromProjectRequest struct {
+	Name      string `path:"name"`
+	SessionID string `path:"session_id"`
+}
+
 type SessionEvent struct {
 	Type      string                 `json:"type"`
 	SessionID string                 `json:"session_id"`

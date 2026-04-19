@@ -44,10 +44,6 @@ func (l *SubmitInputLogic) SubmitInput(req *types.SubmitInputRequest) (*types.Se
 		return nil, errors.New("session not found")
 	}
 
-	if sess.PermissionMgr != nil {
-		sess.PermissionMgr.SetMode(mode)
-	}
-
 	go RunAgent(l.svcCtx.EngineManager, l.svcCtx.SessionManager, l.svcCtx.EventBus, sess)
 
 	return &types.SessionResponse{

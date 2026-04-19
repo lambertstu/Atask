@@ -31,6 +31,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: GetProjectHandler(serverCtx),
 			},
 			{
+				Method:  http.MethodDelete,
+				Path:    "/projects/:name/sessions/:session_id",
+				Handler: RemoveSessionFromProjectHandler(serverCtx),
+			},
+			{
 				Method:  http.MethodPost,
 				Path:    "/sessions",
 				Handler: CreateSessionHandler(serverCtx),

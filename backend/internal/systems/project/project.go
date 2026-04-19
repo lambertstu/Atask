@@ -2,7 +2,7 @@ package project
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,62 +18,52 @@ type Project struct {
 
 type ProjectManager struct {
 	configFile string
-	projects   map[string]*Project
 	mu         sync.RWMutex
 }
 
 func NewProjectManager(projectRoot string) *ProjectManager {
 	configFile := filepath.Join(projectRoot, ".projects/", "projects.json")
+	os.MkdirAll(filepath.Dir(configFile), 0755)
 
-	pm := &ProjectManager{
+	return &ProjectManager{
 		configFile: configFile,
-		projects:   make(map[string]*Project),
 	}
-	pm.load()
-	return pm
 }
 
-func (pm *ProjectManager) load() {
+func (pm *ProjectManager) readAllFromFile() map[string]*Project {
 	data, err := os.ReadFile(pm.configFile)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Printf("Failed to read project config: %v", err)
-		}
-		return
+		return make(map[string]*Project)
 	}
 
 	if len(data) == 0 {
-		return
+		return make(map[string]*Project)
 	}
 
 	var container struct {
 		Projects map[string]*Project `json:"projects"`
 	}
 	if err := json.Unmarshal(data, &container); err != nil {
-		log.Printf("Warning: Failed to parse projects.json: %v", err)
-		return
+		return make(map[string]*Project)
 	}
-	if container.Projects != nil {
-		pm.projects = container.Projects
-		for _, p := range pm.projects {
-			if p.LastModified.IsZero() {
-				p.LastModified = time.Now()
-			}
+	if container.Projects == nil {
+		return make(map[string]*Project)
+	}
+	for _, p := range container.Projects {
+		if p.LastModified.IsZero() {
+			p.LastModified = time.Now()
 		}
 	}
+	return container.Projects
 }
 
-func (pm *ProjectManager) save() {
-	pm.mu.RLock()
+func (pm *ProjectManager) saveAll(projects map[string]*Project) {
 	container := struct {
 		Projects map[string]*Project `json:"projects"`
 	}{
-		Projects: pm.projects,
+		Projects: projects,
 	}
-	pm.mu.RUnlock()
-
 	data, _ := json.MarshalIndent(container, "", "  ")
-	os.MkdirAll(filepath.Dir(pm.configFile), 0755)
 	os.WriteFile(pm.configFile, data, 0644)
 }
 
@@ -82,7 +72,8 @@ func (pm *ProjectManager) GetOrCreate(path string) *Project {
 	defer pm.mu.Unlock()
 
 	key := filepath.Base(path)
-	if project, exists := pm.projects[key]; exists {
+	projects := pm.readAllFromFile()
+	if project, exists := projects[key]; exists {
 		return project
 	}
 
@@ -91,8 +82,8 @@ func (pm *ProjectManager) GetOrCreate(path string) *Project {
 		Sessions:     []string{},
 		LastModified: time.Now(),
 	}
-	pm.projects[key] = project
-	pm.save()
+	projects[key] = project
+	pm.saveAll(projects)
 	return project
 }
 
@@ -101,9 +92,10 @@ func (pm *ProjectManager) OpenProject(path string) *Project {
 	defer pm.mu.Unlock()
 
 	key := filepath.Base(path)
-	if project, exists := pm.projects[key]; exists {
+	projects := pm.readAllFromFile()
+	if project, exists := projects[key]; exists {
 		project.LastModified = time.Now()
-		pm.save()
+		pm.saveAll(projects)
 		return project
 	}
 
@@ -112,8 +104,8 @@ func (pm *ProjectManager) OpenProject(path string) *Project {
 		Sessions:     []string{},
 		LastModified: time.Now(),
 	}
-	pm.projects[key] = project
-	pm.save()
+	projects[key] = project
+	pm.saveAll(projects)
 	return project
 }
 
@@ -122,14 +114,15 @@ func (pm *ProjectManager) AddSession(projectPath, sessionID string) {
 	defer pm.mu.Unlock()
 
 	key := filepath.Base(projectPath)
-	project, exists := pm.projects[key]
+	projects := pm.readAllFromFile()
+	project, exists := projects[key]
 	if !exists {
 		project = &Project{
 			Path:         projectPath,
 			Sessions:     []string{},
 			LastModified: time.Now(),
 		}
-		pm.projects[key] = project
+		projects[key] = project
 	}
 
 	for _, id := range project.Sessions {
@@ -139,27 +132,55 @@ func (pm *ProjectManager) AddSession(projectPath, sessionID string) {
 	}
 	project.Sessions = append(project.Sessions, sessionID)
 	project.LastModified = time.Now()
-	pm.save()
+	pm.saveAll(projects)
 }
 
 func (pm *ProjectManager) GetProject(path string) *Project {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-
+	projects := pm.readAllFromFile()
 	key := filepath.Base(path)
-	return pm.projects[key]
+	return projects[key]
 }
 
 func (pm *ProjectManager) ListProjects() []*Project {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
+	projects := pm.readAllFromFile()
 
 	var list []*Project
-	for _, p := range pm.projects {
+	for _, p := range projects {
 		list = append(list, p)
 	}
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].LastModified.After(list[j].LastModified)
 	})
 	return list
+}
+
+func (pm *ProjectManager) RemoveSession(projectPath, sessionID string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	key := filepath.Base(projectPath)
+	projects := pm.readAllFromFile()
+	project, exists := projects[key]
+	if !exists {
+		return fmt.Errorf("project not found: %s", key)
+	}
+
+	found := false
+	newSessions := make([]string, 0, len(project.Sessions))
+	for _, id := range project.Sessions {
+		if id == sessionID {
+			found = true
+			continue
+		}
+		newSessions = append(newSessions, id)
+	}
+
+	if !found {
+		return fmt.Errorf("session not found in project: %s", sessionID)
+	}
+
+	project.Sessions = newSessions
+	project.LastModified = time.Now()
+	pm.saveAll(projects)
+	return nil
 }

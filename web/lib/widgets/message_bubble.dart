@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/message.dart';
 import 'tool_call_card.dart';
@@ -21,6 +22,19 @@ class _MessageBubbleState extends State<MessageBubble> {
   bool _reasoningExpanded = false;
   bool _toolsExpanded = false;
 
+  void _copyMessage(BuildContext context) {
+    final content = widget.message.content ?? '';
+    if (content.isEmpty) return;
+
+    Clipboard.setData(ClipboardData(text: content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已复制'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.message.role == 'user') {
@@ -32,20 +46,36 @@ class _MessageBubbleState extends State<MessageBubble> {
   }
 
   Widget _buildUserBubble(BuildContext context) {
+    final content = widget.message.content ?? '';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (content.isNotEmpty)
+            InkWell(
+              onTap: () => _copyMessage(context),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.copy,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          const SizedBox(width: 4),
           Flexible(
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
                 color: const Color(0xFF3B82F6),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                widget.message.content ?? '',
+                content,
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -56,6 +86,7 @@ class _MessageBubbleState extends State<MessageBubble> {
   }
 
   Widget _buildAssistantBubble(BuildContext context) {
+    final content = widget.message.content ?? '';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -65,8 +96,12 @@ class _MessageBubbleState extends State<MessageBubble> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6).withAlpha(38),
+              color: const Color(0xFF8B5CF6).withAlpha(30),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF8B5CF6).withAlpha(80),
+                width: 1,
+              ),
             ),
             child: const Icon(
               Icons.smart_toy,
@@ -77,18 +112,35 @@ class _MessageBubbleState extends State<MessageBubble> {
           const SizedBox(width: 8),
           Flexible(
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.message.content != null &&
-                      widget.message.content!.isNotEmpty)
+                  if (content.isNotEmpty)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        InkWell(
+                          onTap: () => _copyMessage(context),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.copy,
+                              size: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (content.isNotEmpty)
                     MarkdownBody(
-                      data: widget.message.content!,
+                      data: content,
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(color: Colors.grey[800]),
                         code: TextStyle(
@@ -98,7 +150,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                         codeblockPadding: const EdgeInsets.all(8),
                         codeblockDecoration: BoxDecoration(
                           color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
@@ -119,7 +171,7 @@ class _MessageBubbleState extends State<MessageBubble> {
 
   Widget _buildReasoningSection() {
     return Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsets.only(top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -152,11 +204,11 @@ class _MessageBubbleState extends State<MessageBubble> {
           ),
           if (_reasoningExpanded)
             Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               decoration: BoxDecoration(
                 color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 widget.message.reasoningContent!,

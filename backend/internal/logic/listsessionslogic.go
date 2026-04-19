@@ -30,7 +30,19 @@ func NewListSessionsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *List
 }
 
 func (l *ListSessionsLogic) ListSessions(req *types.SessionListRequest) (resp *types.SessionListResponse, err error) {
-	sessions := l.svcCtx.SessionManager.ListSessions(req.ProjectPath)
+	var sessions []*session.Session
+
+	if req.ProjectPath != "" {
+		project := l.svcCtx.ProjectManager.GetProject(req.ProjectPath)
+		if project != nil && len(project.Sessions) > 0 {
+			sessions = l.svcCtx.SessionManager.ListSessionsByIDs(project.Sessions)
+		}
+	}
+
+	if sessions == nil {
+		return &types.SessionListResponse{Sessions: nil}, nil
+	}
+
 	var list []types.SessionResponse
 	for _, s := range sessions {
 		list = append(list, convertSessionToResponse(s))

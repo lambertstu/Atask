@@ -1,43 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import '../models/session.dart';
 import '../models/project.dart';
-import '../models/message.dart';
 import '../widgets/session_card.dart';
-import '../widgets/message_bubble.dart';
-import '../services/sse.dart';
+import '../widgets/session_detail_dialog.dart';
 
-class BoardScreen extends StatefulWidget {
+class BoardScreen extends StatelessWidget {
   const BoardScreen({super.key});
-
-  @override
-  State<BoardScreen> createState() => _BoardScreenState();
-}
-
-class _BoardScreenState extends State<BoardScreen> {
-  final SseService _sseService = SseService();
-  final Map<String, StreamSubscription> _sseSubscriptions = {};
-
-  @override
-  void dispose() {
-    for (var subscription in _sseSubscriptions.values) {
-      subscription.cancel();
-    }
-    _sseService.disconnect();
-    super.dispose();
-  }
-
-  void _subscribeToSessionEvents(String sessionId, SessionProvider provider) {
-    if (_sseSubscriptions.containsKey(sessionId)) return;
-
-    final stream = _sseService.connect(sessionId);
-    final subscription = stream.listen((event) {
-      provider.handleEvent(event);
-    });
-    _sseSubscriptions[sessionId] = subscription;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +17,7 @@ class _BoardScreenState extends State<BoardScreen> {
           if (provider.isLoading || provider.isLoadingProjects) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           if (provider.error != null) {
             return Center(
               child: Column(
@@ -69,7 +39,7 @@ class _BoardScreenState extends State<BoardScreen> {
               ),
             );
           }
-          
+
           return Row(
             children: [
               _buildSidebar(context, provider),
@@ -89,7 +59,7 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   Widget _buildSidebar(BuildContext context, SessionProvider provider) {
     return Container(
       width: 260,
@@ -100,13 +70,15 @@ class _BoardScreenState extends State<BoardScreen> {
       child: Column(
         children: [
           _buildLogo(context),
+          const SizedBox(height: 8),
+          _buildOpenProjectButton(context),
           const SizedBox(height: 16),
           _buildProjectList(context, provider),
         ],
       ),
     );
   }
-  
+
   Widget _buildLogo(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -130,7 +102,7 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   Widget _buildProjectList(BuildContext context, SessionProvider provider) {
     return Expanded(
       child: ListView(
@@ -146,82 +118,91 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   Widget _buildProjectItem(
     BuildContext context,
     Project? project,
     String title,
     bool isSelected,
   ) {
-    final colors = {
-      null: Colors.grey,
-      'Q4 Market Analysis': const Color(0xFF8B5CF6),
-      'Competitor Tracking': Colors.blue,
-      'Customer Support Automation': Colors.green,
-      'Content Strategy': Colors.orange,
-    };
-    
-    final color = colors[title] ?? Colors.grey;
-    
+    final color = project != null ? _getProjectColor(project.name) : Colors.grey;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         color: isSelected ? color.withAlpha(38) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? color : Colors.grey[800],
-                  fontSize: 14,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (isSelected)
+      child: InkWell(
+        onTap: () => context.read<SessionProvider>().selectProject(project),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                width: 4,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: color.withAlpha(38),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
                 ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Text(
-                  'Active',
+                  title,
                   style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? color : Colors.grey[800],
+                    fontSize: 14,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isSelected)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(38),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Active',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        onTap: () => _selectProject(context, project),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+            ],
+          ),
         ),
       ),
     );
   }
-  
-  void _selectProject(BuildContext context, Project? project) {
-    context.read<SessionProvider>().selectProject(project);
+
+  Widget _buildOpenProjectButton(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.folder_open, size: 18),
+        label: const Text('打开项目'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF8B5CF6),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onPressed: () => _showOpenProjectDialog(context),
+      ),
+    );
   }
-  
+
   Widget _buildTopBar(BuildContext context, SessionProvider provider) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -231,14 +212,6 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
       child: Row(
         children: [
-          _buildActionButton(
-            context,
-            icon: Icons.folder_open,
-            label: '打开项目',
-            onPressed: () => _showOpenProjectDialog(context),
-            isPrimary: false,
-          ),
-          const SizedBox(width: 16),
           Expanded(
             child: _buildSearchBar(context),
           ),
@@ -247,7 +220,7 @@ class _BoardScreenState extends State<BoardScreen> {
             context,
             icon: Icons.add,
             label: 'New Session',
-            onPressed: () => _showCreateSessionDialog(context),
+            onPressed: () => _createSessionDirectly(context),
             isPrimary: true,
           ),
           const SizedBox(width: 8),
@@ -263,7 +236,7 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   Widget _buildSearchBar(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -281,7 +254,7 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   Widget _buildActionButton(
     BuildContext context, {
     required IconData icon,
@@ -302,7 +275,7 @@ class _BoardScreenState extends State<BoardScreen> {
         onPressed: onPressed,
       );
     }
-    
+
     return OutlinedButton.icon(
       icon: Icon(icon, size: 18),
       label: Text(label),
@@ -315,13 +288,20 @@ class _BoardScreenState extends State<BoardScreen> {
       onPressed: onPressed,
     );
   }
-  
+
   Widget _buildKanbanBoard(BuildContext context, SessionProvider provider) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildKanbanColumn(
+            context,
+            'Completed',
+            provider.completedSessions,
+            const Color(0xFF059669),
+          ),
+          const SizedBox(width: 16),
           _buildKanbanColumn(
             context,
             'Scheduled',
@@ -349,18 +329,11 @@ class _BoardScreenState extends State<BoardScreen> {
             provider.blockedSessions,
             Colors.orange,
           ),
-          const SizedBox(width: 16),
-          _buildKanbanColumn(
-            context,
-            'Completed',
-            provider.completedSessions,
-            const Color(0xFF059669),
-          ),
         ],
       ),
     );
   }
-  
+
   Widget _buildKanbanColumn(
     BuildContext context,
     String title,
@@ -372,6 +345,10 @@ class _BoardScreenState extends State<BoardScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFF0F1F5),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey[300]!,
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,31 +386,22 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
             Expanded(
               child: sessions.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No sessions',
-                        style: TextStyle(color: Colors.grey[400]),
-                      ),
-                    )
+                  ? const SizedBox.shrink()
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       itemCount: sessions.length,
                       itemBuilder: (context, index) {
                         final session = sessions[index];
-                        if (session.state == SessionState.processing ||
-                            session.state == SessionState.planning) {
-                          _subscribeToSessionEvents(session.id, context.read<SessionProvider>());
-                        }
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: SessionCard(
                             session: session,
                             onTap: () => _showSessionDetail(context, session),
                             onApprove: session.state == SessionState.blocked
-                                ? () => context.read<SessionProvider>().unblock(session.id, true)
+                                ? (addAllowed) => context.read<SessionProvider>().unblock(session.id, true, addAllowed: addAllowed)
                                 : null,
                             onReject: session.state == SessionState.blocked
-                                ? () => context.read<SessionProvider>().unblock(session.id, false)
+                                ? (addAllowed) => context.read<SessionProvider>().unblock(session.id, false, addAllowed: addAllowed)
                                 : null,
                           ),
                         );
@@ -445,7 +413,7 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
   }
-  
+
   void _showOpenProjectDialog(BuildContext context) {
     String path = '';
     showDialog(
@@ -483,249 +451,59 @@ class _BoardScreenState extends State<BoardScreen> {
         );
       },
     );
-}
+  }
 
-void _showCreateSessionDialog(BuildContext context) {
+  Future<void> _createSessionDirectly(BuildContext context) async {
     final provider = context.read<SessionProvider>();
-    String? projectPath = provider.selectedProject?.path;
-    String input = '';
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Create New Session'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (provider.projects.isEmpty)
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: 'Project Path',
-                      hintText: '/path/to/project',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) => projectPath = value,
-                  ),
-                if (provider.projects.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    value: projectPath,
-                    decoration: const InputDecoration(
-                      labelText: 'Project',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: provider.projects.map((p) => DropdownMenuItem(
-                      value: p.path,
-                      child: Text(p.name),
-                    )).toList(),
-                    onChanged: (value) => projectPath = value,
-                  ),
-                const SizedBox(height: 16),
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Task Description',
-                    hintText: 'What do you want the agent to do?',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 4,
-                  onChanged: (value) => input = value,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (projectPath != null && projectPath!.isNotEmpty) {
-                  final sess = await provider.createSession(projectPath!);
-                  if (input.isNotEmpty) {
-                    provider.submitInput(sess.id, input);
-                  }
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Create Session'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  void _showSessionDetail(BuildContext context, Session session) {
-    final processedMessages = _processMessages(session.messages);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withAlpha(38),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.chat,
-                  color: Color(0xFF8B5CF6),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Session ${session.id.substring(0, 8)}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      session.projectName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getStateColor(session.state).withAlpha(38),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  session.state.name,
-                  style: TextStyle(
-                    color: _getStateColor(session.state),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 600,
-            height: 500,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.model_training, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        session.model,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(Icons.settings, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        session.mode.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: processedMessages.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No messages',
-                            style: TextStyle(color: Colors.grey[400]),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          itemCount: processedMessages.length,
-                          itemBuilder: (context, index) {
-                            final item = processedMessages[index];
-                            return MessageBubble(
-                              message: item.message,
-                              toolResults: item.toolResults,
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  List<_ProcessedMessage> _processMessages(List<ChatMessage> messages) {
-    final toolResultsMap = <String, String>{};
-    
-    for (final msg in messages) {
-      if (msg.role == 'tool' && msg.toolCallId != null && msg.content != null) {
-        toolResultsMap[msg.toolCallId!] = msg.content!;
+    if (provider.selectedProject == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先选择一个项目')),
+      );
+      return;
+    }
+
+    try {
+      final session = await provider.createSession(
+        provider.selectedProject!.path,
+        model: 'glm-5',
+      );
+
+      provider.loadSessions(projectName: provider.selectedProject?.name);
+
+      if (context.mounted) {
+        _showSessionDetail(context, session);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建会话失败: $e')),
+        );
       }
     }
-    
-    return messages
-        .where((msg) => msg.role != 'tool')
-        .map((msg) => _ProcessedMessage(
-          message: msg,
-          toolResults: toolResultsMap,
-        ))
-        .toList();
   }
 
-  Color _getStateColor(SessionState state) {
-    switch (state) {
-      case SessionState.pending:
-        return const Color(0xFF3B82F6);
-      case SessionState.planning:
-        return const Color(0xFF8B5CF6);
-      case SessionState.processing:
-        return const Color(0xFF10B981);
-      case SessionState.blocked:
-        return const Color(0xFFF59E0B);
-      case SessionState.completed:
-        return const Color(0xFF059669);
-    }
+  void _showSessionDetail(BuildContext context, Session session) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return SessionDetailDialog(sessionId: session.id);
+      },
+    );
   }
-}
 
-class _ProcessedMessage {
-  final ChatMessage message;
-  final Map<String, String> toolResults;
-
-  _ProcessedMessage({
-    required this.message,
-    required this.toolResults,
-  });
+  Color _getProjectColor(String projectName) {
+    final colors = [
+      const Color(0xFF8B5CF6),
+      const Color(0xFF3B82F6),
+      const Color(0xFF10B981),
+      const Color(0xFFF59E0B),
+      const Color(0xFFEF4444),
+      const Color(0xFF14B8A6),
+      const Color(0xFFEC4899),
+      const Color(0xFF6366F1),
+    ];
+    final hash = projectName.hashCode;
+    return colors[hash.abs() % colors.length];
+  }
 }

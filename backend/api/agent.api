@@ -88,6 +88,10 @@ type (
 	GetProjectRequest {
 		name string `path:"name"`
 	}
+	RemoveSessionFromProjectRequest {
+		Name      string `path:"name"`
+		SessionID string `path:"session_id"`
+	}
 )
 
 @server (
@@ -99,6 +103,9 @@ service agent-api {
 
 	@handler GetProject
 	get /projects/:name (GetProjectRequest) returns (ProjectResponse)
+
+	@handler RemoveSessionFromProject
+	delete /projects/:name/sessions/:session_id (RemoveSessionFromProjectRequest) returns (ProjectResponse)
 
 	@handler CreateProject
 	post /projects (CreateProjectRequest) returns (ProjectResponse)

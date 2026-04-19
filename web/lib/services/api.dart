@@ -55,6 +55,15 @@ class ApiService {
     }
   }
 
+  Future<Project> removeSessionFromProject(String projectName, String sessionId) async {
+    try {
+      final resp = await _dio.delete('/api/projects/$projectName/sessions/$sessionId');
+      return Project.fromJson(resp.data);
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to remove session', statusCode: e.response?.statusCode);
+    }
+  }
+
   // ============ Session APIs ============
 
   Future<List<Session>> listSessions({String? projectName}) async {

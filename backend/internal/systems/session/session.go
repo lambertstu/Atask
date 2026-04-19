@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,11 +42,20 @@ type Session struct {
 	CancelFunc      context.CancelFunc          `json:"-"`
 }
 
+type SessionRuntime struct {
+	PermissionMgr   *security.PermissionManager
+	BlockedResponse chan PermissionDecision
+	Ctx             context.Context
+	CancelFunc      context.CancelFunc
+}
+
 type SessionManager struct {
 	sessionsDir string
-	sessions    map[string]*Session
 	mu          sync.RWMutex
 	eventBus    *events.EventBus
+
+	runtimeMu  sync.Mutex
+	runtimeMap map[string]*SessionRuntime
 }
 
 func generateID() string {
@@ -58,37 +68,10 @@ func NewSessionManager(projectPath string, eventBus *events.EventBus) *SessionMa
 	sessionsDir := filepath.Join(projectPath, ".sessions")
 	os.MkdirAll(sessionsDir, 0755)
 
-	sm := &SessionManager{
+	return &SessionManager{
 		sessionsDir: sessionsDir,
-		sessions:    make(map[string]*Session),
 		eventBus:    eventBus,
-	}
-	sm.loadAll()
-	return sm
-}
-
-func (sm *SessionManager) loadAll() {
-	files, _ := filepath.Glob(filepath.Join(sm.sessionsDir, "*.json"))
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			continue
-		}
-		var session Session
-		if err := json.Unmarshal(data, &session); err != nil {
-			continue
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		session.Ctx = ctx
-		session.CancelFunc = cancel
-
-		pm := security.NewPermissionManager(security.PlanMode, session.ProjectPath)
-		blockingChan := make(chan security.BlockingRequest, 10)
-		pm.SetBlockingChannel(blockingChan)
-		session.PermissionMgr = pm
-		session.BlockedResponse = make(chan PermissionDecision, 1)
-
-		sm.sessions[session.ID] = &session
+		runtimeMap:  make(map[string]*SessionRuntime),
 	}
 }
 
@@ -115,7 +98,6 @@ func (sm *SessionManager) CreateSession(projectPath, model string) *Session {
 		Ctx:             ctx,
 		CancelFunc:      cancel,
 	}
-	sm.sessions[session.ID] = session
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -129,20 +111,42 @@ func (sm *SessionManager) CreateSession(projectPath, model string) *Session {
 }
 
 func (sm *SessionManager) GetSession(id string) *Session {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	return sm.sessions[id]
+	session, _ := sm.loadFromFile(id)
+	return session
 }
 
 func (sm *SessionManager) ListSessions(projectPath string) []*Session {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
+	files, err := filepath.Glob(filepath.Join(sm.sessionsDir, "*.json"))
+	if err != nil {
+		return nil
+	}
 
 	var list []*Session
-	for _, s := range sm.sessions {
-		if filepath.Base(s.ProjectPath) == projectPath {
-			list = append(list, s)
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
 		}
+		var session Session
+		if err := json.Unmarshal(data, &session); err != nil {
+			continue
+		}
+		if filepath.Base(session.ProjectPath) == projectPath {
+			sm.initRuntimeFields(&session)
+			list = append(list, &session)
+		}
+	}
+	return list
+}
+
+func (sm *SessionManager) ListSessionsByIDs(ids []string) []*Session {
+	var list []*Session
+	for _, id := range ids {
+		session, err := sm.loadFromFile(id)
+		if err != nil {
+			continue
+		}
+		list = append(list, session)
 	}
 	return list
 }
@@ -151,8 +155,8 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -180,6 +184,8 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 	session.BlockedArgs = nil
 
 	oldState := session.State
+	session.Mode = mode
+	session.PermissionMgr.SetMode(mode)
 	session.State = newState
 	sm.save(session)
 
@@ -198,8 +204,8 @@ func (sm *SessionManager) Transition(sessionID string, newState SessionState, mo
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -227,8 +233,8 @@ func (sm *SessionManager) SetBlocked(sessionID, blockedOn, blockedTool string, b
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -260,8 +266,8 @@ func (sm *SessionManager) ClearBlockedState(sessionID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -300,11 +306,22 @@ func (sm *SessionManager) UpdateMessages(sessionID string, messages []openai.Cha
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
-	session.Messages = messages
+
+	filtered := make([]openai.ChatCompletionMessage, 0, len(messages))
+	for _, msg := range messages {
+		if msg.Role == openai.ChatMessageRoleUser && strings.Contains(msg.Content, "<reminder>") {
+			continue
+		}
+		if msg.Role == openai.ChatMessageRoleTool && strings.Contains(msg.Content, "[Previous:") {
+			continue
+		}
+		filtered = append(filtered, msg)
+	}
+	session.Messages = filtered
 	sm.save(session)
 	return nil
 }
@@ -315,12 +332,73 @@ func (sm *SessionManager) save(session *Session) {
 	os.WriteFile(path, data, 0644)
 }
 
+func (sm *SessionManager) initRuntimeFields(session *Session) {
+	sm.runtimeMu.Lock()
+	defer sm.runtimeMu.Unlock()
+
+	if rt, exists := sm.runtimeMap[session.ID]; exists {
+		session.Ctx = rt.Ctx
+		session.CancelFunc = rt.CancelFunc
+		session.PermissionMgr = rt.PermissionMgr
+		session.BlockedResponse = rt.BlockedResponse
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	mode := session.Mode
+	if mode == "" {
+		mode = security.PlanMode
+	}
+	pm := security.NewPermissionManager(mode, session.ProjectPath)
+	blockingChan := make(chan security.BlockingRequest, 10)
+	pm.SetBlockingChannel(blockingChan)
+
+	rt := &SessionRuntime{
+		Ctx:             ctx,
+		CancelFunc:      cancel,
+		PermissionMgr:   pm,
+		BlockedResponse: make(chan PermissionDecision, 1),
+	}
+
+	sm.runtimeMap[session.ID] = rt
+
+	session.Ctx = rt.Ctx
+	session.CancelFunc = rt.CancelFunc
+	session.PermissionMgr = rt.PermissionMgr
+	session.BlockedResponse = rt.BlockedResponse
+}
+
+func (sm *SessionManager) loadFromFile(id string) (*Session, error) {
+	path := filepath.Join(sm.sessionsDir, id+".json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var session Session
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, err
+	}
+	sm.initRuntimeFields(&session)
+	return &session, nil
+}
+
+func (sm *SessionManager) cleanupRuntime(sessionID string) {
+	sm.runtimeMu.Lock()
+	defer sm.runtimeMu.Unlock()
+	if rt, exists := sm.runtimeMap[sessionID]; exists {
+		if rt.CancelFunc != nil {
+			rt.CancelFunc()
+		}
+		delete(sm.runtimeMap, sessionID)
+	}
+}
+
 func (sm *SessionManager) CompleteSession(sessionID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
@@ -328,16 +406,8 @@ func (sm *SessionManager) CompleteSession(sessionID string) error {
 		return err
 	}
 
-	var sessionState SessionState
-	switch session.Mode {
-	case security.PlanMode:
-		sessionState = StatePlanning
-	case security.BuildMode:
-		sessionState = StateCompleted
-	}
-
 	oldState := session.State
-	session.State = sessionState
+	session.State = StateCompleted
 	sm.save(session)
 
 	if sm.eventBus != nil {
@@ -347,6 +417,8 @@ func (sm *SessionManager) CompleteSession(sessionID string) error {
 		}))
 	}
 
+	sm.cleanupRuntime(session.ID)
+
 	return nil
 }
 
@@ -354,14 +426,12 @@ func (sm *SessionManager) CancelSession(sessionID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	session := sm.sessions[sessionID]
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
-	if session.CancelFunc != nil {
-		session.CancelFunc()
-	}
+	sm.cleanupRuntime(session.ID)
 
 	if sm.eventBus != nil {
 		sm.eventBus.Publish(session.ID, events.NewEvent(events.EventStateChange, session.ID, map[string]interface{}{
@@ -374,11 +444,8 @@ func (sm *SessionManager) CancelSession(sessionID string) error {
 }
 
 func (sm *SessionManager) SubmitPermissionDecision(sessionID string, decision PermissionDecision) error {
-	sm.mu.RLock()
-	session := sm.sessions[sessionID]
-	sm.mu.RUnlock()
-
-	if session == nil {
+	session, err := sm.loadFromFile(sessionID)
+	if err != nil {
 		return fmt.Errorf("session not found")
 	}
 
