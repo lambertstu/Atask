@@ -70,6 +70,9 @@ func (e *AgentEngine) RunStream(
 
 		assistantMessage := resp.Choices[0].Message
 		messages = append(messages, assistantMessage)
+		if sessionMgr != nil {
+			sessionMgr.UpdateMessages(sessionID, messages)
+		}
 
 		if len(assistantMessage.ToolCalls) == 0 {
 			if assistantMessage.Content != "" {
@@ -159,7 +162,7 @@ func (e *AgentEngine) RunStream(
 				output := fn()
 
 				printMu.Lock()
-				fmt.Printf("\033[33m> %s %s:\033[0m\n", call.Function.Name, call.Function.Arguments)
+				//fmt.Printf("\033[33m> %s %s:\033[0m\n", call.Function.Name, call.Function.Arguments)
 				if len(output) > 200 {
 					fmt.Println(output[:200])
 				} else {
@@ -196,6 +199,9 @@ func (e *AgentEngine) RunStream(
 				ToolCallID: toolCall.ID,
 				Content:    finalOutput,
 			})
+			if sessionMgr != nil {
+				sessionMgr.UpdateMessages(sessionID, messages)
+			}
 
 			if toolCall.Function.Name == "todo" {
 				usedTodoThisRound = true
@@ -207,11 +213,14 @@ func (e *AgentEngine) RunStream(
 		}
 
 		if manualCompactRequested {
+			messages = e.contextMgr.AutoCompact(messages)
+			if sessionMgr != nil {
+				sessionMgr.UpdateMessages(sessionID, messages)
+			}
 			emitter.Emit(events.EventThinking, map[string]interface{}{
 				"session_id": sessionID,
 				"action":     "manual_compact",
 			})
-			messages = e.contextMgr.AutoCompact(messages)
 		}
 
 		roundsSinceTodo++

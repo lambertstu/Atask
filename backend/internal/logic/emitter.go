@@ -46,11 +46,7 @@ func RunAgent(em *engine.EngineManager, sm *session.SessionManager, eb *events.E
 	engCtx.Engine.SetPermissionManager(sess.PermissionMgr)
 
 	emitter := NewSessionEmitter(eb, sess.ID)
-	updatedMessages, err := engCtx.Engine.RunStream(sess.Ctx, sess.Messages, emitter, sess.ID, sm)
-
-	if len(updatedMessages) > 0 {
-		sm.UpdateMessages(sess.ID, updatedMessages)
-	}
+	_, err := engCtx.Engine.RunStream(sess.Ctx, sess.Messages, emitter, sess.ID, sm)
 
 	if err != nil {
 		eb.Publish(sess.ID, events.NewEvent(events.EventError, sess.ID, map[string]interface{}{
