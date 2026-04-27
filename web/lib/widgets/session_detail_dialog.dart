@@ -447,6 +447,39 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
                         ),
                 ),
                 const SizedBox(height: 12),
+                if (provider.getSessionStatus(session.id) != null)
+                  Builder(
+                    builder: (context) {
+                      final statusMessage = provider.getSessionStatus(session.id)!;
+                      final isError = statusMessage.contains('失败') || statusMessage.contains('Error');
+                      final bannerColor = isError ? Colors.red : Colors.orange;
+                      final bannerBgColor = isError ? Colors.red.shade50 : Colors.orange.shade50;
+                      final bannerBorderColor = isError ? Colors.red.shade200 : Colors.orange.shade200;
+                      final bannerIcon = isError ? Icons.error_outline : Icons.warning_amber_rounded;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: bannerBgColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: bannerBorderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(bannerIcon, size: 16, color: bannerColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                statusMessage,
+                                style: TextStyle(color: bannerColor, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  ),
                 session.state == SessionState.blocked
                     ? _buildBlockedPanel(provider, session)
                     : _buildInputArea(provider, session),

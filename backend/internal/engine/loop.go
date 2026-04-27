@@ -37,7 +37,7 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 			ToolChoice: "auto",
 		}
 
-		resp, err := e.recoveryMgr.CreateWithRecovery(ctx, req, &messages)
+		resp, err := e.recoveryMgr.CreateWithRecovery(ctx, req, &messages, nil, "")
 		if err != nil {
 			return messages, err
 		}

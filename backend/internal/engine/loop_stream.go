@@ -66,7 +66,7 @@ func (e *AgentEngine) RunStream(
 			"action":     "llm_call",
 		})
 
-		resp, err := e.recoveryMgr.CreateWithRecovery(ctx, req, &messages)
+		resp, err := e.recoveryMgr.CreateWithRecovery(ctx, req, &messages, emitter, sessionID)
 		if err != nil {
 			emitter.Emit(events.EventError, map[string]interface{}{
 				"session_id": sessionID,

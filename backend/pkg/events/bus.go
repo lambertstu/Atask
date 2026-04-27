@@ -21,6 +21,7 @@ const (
 	EventBlocked          EventType = "blocked"
 	EventCompleted        EventType = "completed"
 	EventError            EventType = "error"
+	EventRetry            EventType = "retry"
 )
 
 type Event struct {

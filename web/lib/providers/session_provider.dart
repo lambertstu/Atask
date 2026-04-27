@@ -11,6 +11,8 @@ class SessionProvider extends ChangeNotifier {
   final SseService _sseService = SseService();
   final Map<String, StreamSubscription<SessionEvent>> _sseSubscriptions = {};
   Timer? _refreshTimer;
+  
+  final Map<String, String> _sessionStatuses = {};
 
   List<Project> _projects = [];
   List<Session> _sessions = [];
@@ -25,6 +27,7 @@ class SessionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLoadingProjects => _isLoadingProjects;
   String? get error => _error;
+  String? getSessionStatus(String sessionId) => _sessionStatuses[sessionId];
 
   List<Session> get pendingSessions => _sessions.where((s) => s.state == SessionState.pending).toList();
   List<Session> get planningSessions => _sessions.where((s) => s.state == SessionState.planning).toList();
@@ -217,13 +220,39 @@ class SessionProvider extends ChangeNotifier {
     _fetchSessionMessages(event.sessionId);
 
     switch (event.type) {
+      case 'retry':
+        final attempt = event.data['attempt'];
+        final maxAttempts = event.data['max_attempts'];
+        _sessionStatuses[event.sessionId] = '请求受限，正在重试 ($attempt/$maxAttempts) ...';
+        notifyListeners();
+        break;
+      case 'thinking':
+      case 'assistant_message':
+        if (_sessionStatuses.containsKey(event.sessionId)) {
+          _sessionStatuses.remove(event.sessionId);
+          notifyListeners();
+        }
+        break;
       case 'state_change':
+        if (_sessionStatuses.containsKey(event.sessionId)) {
+          _sessionStatuses.remove(event.sessionId);
+          notifyListeners();
+        }
         _refreshSessionsDebounced();
         break;
       case 'blocked':
         _refreshSessionsDebounced();
         break;
+      case 'error':
+        final errorMsg = event.data['error'] ?? '未知错误';
+        _sessionStatuses[event.sessionId] = '请求失败：$errorMsg';
+        notifyListeners();
+        break;
       case 'completed':
+        if (_sessionStatuses.containsKey(event.sessionId)) {
+          _sessionStatuses.remove(event.sessionId);
+          notifyListeners();
+        }
         unsubscribeFromSession(event.sessionId);
         break;
     }

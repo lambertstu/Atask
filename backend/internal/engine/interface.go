@@ -27,7 +27,7 @@ type ContextManager interface {
 }
 
 type RecoveryManager interface {
-	CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error)
+	CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage, emitter EventEmitter, sessionID string) (*openai.ChatCompletionResponse, error)
 }
 
 type AgentEngine struct {

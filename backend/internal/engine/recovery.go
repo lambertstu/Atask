@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"agent-base/internal/llm"
+	"agent-base/pkg/events"
 
 	"github.com/sashabaranov/go-openai"
 )
 
 const (
-	MAX_RECOVERY_ATTEMPTS = 10
+	MAX_RECOVERY_ATTEMPTS = 5
 	BACKOFF_BASE_DELAY    = 1.0
 	BACKOFF_MAX_DELAY     = 30.0
 )
@@ -45,7 +46,7 @@ func backoffDelay(attempt int) float64 {
 	return delay + jitter
 }
 
-func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error) {
+func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req openai.ChatCompletionRequest, messages *[]openai.ChatCompletionMessage, emitter EventEmitter, sessionID string) (*openai.ChatCompletionResponse, error) {
 	maxOutputRecoveryCount := 0
 
 	for {
@@ -91,6 +92,15 @@ func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req opena
 			if attempt < MAX_RECOVERY_ATTEMPTS {
 				delay := backoffDelay(attempt)
 				fmt.Printf("[Recovery] API error: %v. Retrying in %.1fs (attempt %d/%d)\n", err, delay, attempt+1, MAX_RECOVERY_ATTEMPTS)
+				if emitter != nil {
+					emitter.Emit(events.EventRetry, map[string]interface{}{
+						"session_id":   sessionID,
+						"error":        err.Error(),
+						"delay":        delay,
+						"attempt":      attempt + 1,
+						"max_attempts": MAX_RECOVERY_ATTEMPTS,
+					})
+				}
 				time.Sleep(time.Duration(delay * float64(time.Second)))
 				continue
 			}
