@@ -445,6 +445,7 @@ class BoardScreen extends StatelessWidget {
 
   Future<void> _createSessionDirectly(BuildContext context) async {
     final provider = context.read<SessionProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
 
     if (provider.selectedProject == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -456,7 +457,7 @@ class BoardScreen extends StatelessWidget {
     try {
       final session = await provider.createSession(
         provider.selectedProject!.path,
-        model: 'glm-5',
+        model: settingsProvider.config?.model ?? 'glm-5',
       );
 
       provider.loadSessions(projectName: provider.selectedProject?.name);
@@ -509,10 +510,7 @@ class BoardScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) {
-        return ChangeNotifierProvider(
-          create: (_) => SettingsProvider(),
-          child: const LLMConfigDialog(),
-        );
+        return const LLMConfigDialog();
       },
     );
   }

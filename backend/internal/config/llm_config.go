@@ -10,10 +10,11 @@ import (
 )
 
 type LLMConfig struct {
-	APIKey    string `json:"api_key"`
-	BaseURL   string `json:"base_url"`
-	Model     string `json:"model"`
-	UpdatedAt string `json:"updated_at"`
+	APIKey    string   `json:"api_key"`
+	BaseURL   string   `json:"base_url"`
+	Model     string   `json:"model"`
+	Models    []string `json:"models"`
+	UpdatedAt string   `json:"updated_at"`
 }
 
 type LLMConfigManager struct {
@@ -36,6 +37,7 @@ func NewLLMConfigManager(projectRoot, defaultAPIKey, defaultBaseURL, defaultMode
 			APIKey:    defaultAPIKey,
 			BaseURL:   defaultBaseURL,
 			Model:     defaultModel,
+			Models:    []string{defaultModel},
 			UpdatedAt: time.Now().Format(time.RFC3339),
 		}
 	}
@@ -64,6 +66,7 @@ func (m *LLMConfigManager) saveToFile() error {
 		APIKey:    m.config.APIKey,
 		BaseURL:   m.config.BaseURL,
 		Model:     m.config.Model,
+		Models:    append([]string(nil), m.config.Models...),
 		UpdatedAt: m.config.UpdatedAt,
 	}
 	configPath := m.configPath
@@ -80,11 +83,12 @@ func (m *LLMConfigManager) Get() *LLMConfig {
 		APIKey:    m.config.APIKey,
 		BaseURL:   m.config.BaseURL,
 		Model:     m.config.Model,
+		Models:    append([]string(nil), m.config.Models...),
 		UpdatedAt: m.config.UpdatedAt,
 	}
 }
 
-func (m *LLMConfigManager) Update(apiKey, baseURL, model string) error {
+func (m *LLMConfigManager) Update(apiKey, baseURL, model string, models []string) error {
 	m.mu.Lock()
 	if apiKey != "" {
 		m.config.APIKey = apiKey
@@ -95,12 +99,16 @@ func (m *LLMConfigManager) Update(apiKey, baseURL, model string) error {
 	if model != "" {
 		m.config.Model = model
 	}
+	if models != nil {
+		m.config.Models = append([]string(nil), models...)
+	}
 	m.config.UpdatedAt = time.Now().Format(time.RFC3339)
 
 	cfg := &LLMConfig{
 		APIKey:    m.config.APIKey,
 		BaseURL:   m.config.BaseURL,
 		Model:     m.config.Model,
+		Models:    append([]string(nil), m.config.Models...),
 		UpdatedAt: m.config.UpdatedAt,
 	}
 	configPath := m.configPath

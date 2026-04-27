@@ -18,6 +18,7 @@ type CommandProcessor struct {
 	MemoryMgr     *memory.MemoryManager
 	PromptBuilder PromptBuilder
 	ContextMgr    ContextManager
+	Model         string
 }
 
 // Handle 处理输入的命令，返回 (是否是系统命令, 更新后的history)
@@ -76,7 +77,7 @@ func (cp *CommandProcessor) Handle(query string, history []openai.ChatCompletion
 
 	if query == "/compact" {
 		fmt.Println("[Manual compact requested by user...]")
-		history = cp.ContextMgr.AutoCompact(history)
+		history = cp.ContextMgr.AutoCompact(history, cp.Model)
 		return true, history
 	}
 

@@ -14,6 +14,7 @@ class _LLMConfigDialogState extends State<LLMConfigDialog> {
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _baseUrlController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _modelsController = TextEditingController();
   bool _obscureApiKey = true;
   bool _isLoading = false;
   bool _initialized = false;
@@ -31,6 +32,7 @@ class _LLMConfigDialogState extends State<LLMConfigDialog> {
     _apiKeyController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
+    _modelsController.dispose();
     super.dispose();
   }
 
@@ -38,6 +40,7 @@ class _LLMConfigDialogState extends State<LLMConfigDialog> {
     _apiKeyController.text = '';
     _baseUrlController.text = config.baseUrl;
     _modelController.text = config.model;
+    _modelsController.text = config.models.join(', ');
     _initialized = true;
   }
 
@@ -51,11 +54,16 @@ class _LLMConfigDialogState extends State<LLMConfigDialog> {
     final apiKey = _apiKeyController.text.trim();
     final baseUrl = _baseUrlController.text.trim();
     final model = _modelController.text.trim();
+    final modelsText = _modelsController.text.trim();
+    final models = modelsText.isEmpty 
+        ? <String>[] 
+        : modelsText.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
     final newConfig = LLMConfig(
       apiKey: apiKey,
       baseUrl: baseUrl,
       model: model,
+      models: models,
       hasApiKey: apiKey.isNotEmpty,
       updatedAt: '',
     );
@@ -169,6 +177,19 @@ class _LLMConfigDialogState extends State<LLMConfigDialog> {
                   controller: _modelController,
                   decoration: InputDecoration(
                     hintText: 'glm-5',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Models (comma separated)', style: TextStyle(fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _modelsController,
+                  decoration: InputDecoration(
+                    hintText: 'glm-5, glm-4, qwen-max',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),

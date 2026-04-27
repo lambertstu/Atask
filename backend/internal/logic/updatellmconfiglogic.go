@@ -27,7 +27,7 @@ func NewUpdateLLMConfigLogic(ctx context.Context, svcCtx *svc.ServiceContext) *U
 }
 
 func (l *UpdateLLMConfigLogic) UpdateLLMConfig(req *types.LLMConfigRequest) (resp *types.LLMConfigResponse, err error) {
-	if err := l.svcCtx.LLMConfigMgr.Update(req.APIKey, req.BaseURL, req.Model); err != nil {
+	if err := l.svcCtx.LLMConfigMgr.Update(req.APIKey, req.BaseURL, req.Model, req.Models); err != nil {
 		return nil, err
 	}
 
@@ -41,6 +41,7 @@ func (l *UpdateLLMConfigLogic) UpdateLLMConfig(req *types.LLMConfigRequest) (res
 		APIKey:    l.svcCtx.LLMConfigMgr.MaskAPIKey(),
 		BaseURL:   cfg.BaseURL,
 		Model:     cfg.Model,
+		Models:    cfg.Models,
 		HasAPIKey: l.svcCtx.LLMConfigMgr.HasAPIKey(),
 		UpdatedAt: cfg.UpdatedAt,
 	}, nil

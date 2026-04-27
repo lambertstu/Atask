@@ -151,7 +151,7 @@ func (sm *SessionManager) ListSessionsByIDs(ids []string) []*Session {
 	return list
 }
 
-func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
+func (sm *SessionManager) SubmitInput(sessionID, input, mode, model string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -185,6 +185,9 @@ func (sm *SessionManager) SubmitInput(sessionID, input, mode string) error {
 
 	oldState := session.State
 	session.Mode = mode
+	if model != "" {
+		session.Model = model
+	}
 	session.PermissionMgr.SetMode(mode)
 	session.State = newState
 	session.CreatedAt = time.Now()

@@ -20,7 +20,7 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 
 		if e.contextMgr.EstimateTokens(messages) > e.contextThreshold {
 			fmt.Println("[auto_compact triggered]")
-			messages = e.contextMgr.AutoCompact(messages)
+			messages = e.contextMgr.AutoCompact(messages, e.model)
 		}
 
 		system := e.promptBuilder.Build()
@@ -173,7 +173,7 @@ func (e *AgentEngine) Run(ctx context.Context, messages []openai.ChatCompletionM
 
 		if manualCompactRequested {
 			fmt.Println("[manual compact triggered]")
-			messages = e.contextMgr.AutoCompact(messages)
+			messages = e.contextMgr.AutoCompact(messages, e.model)
 		}
 
 		roundsSinceTodo++

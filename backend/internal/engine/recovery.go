@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MAX_RECOVERY_ATTEMPTS = 3
+	MAX_RECOVERY_ATTEMPTS = 10
 	BACKOFF_BASE_DELAY    = 1.0
 	BACKOFF_MAX_DELAY     = 30.0
 )
@@ -53,7 +53,7 @@ func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req opena
 
 		if rm.contextMgr.EstimateTokens(*messages) > CONTEXT_THRESHOLD {
 			fmt.Println("[auto_compact triggered]")
-			*messages = rm.contextMgr.AutoCompact(*messages)
+			*messages = rm.contextMgr.AutoCompact(*messages, req.Model)
 		}
 
 		req.Messages = append([]openai.ChatCompletionMessage{
@@ -78,7 +78,7 @@ func (rm *RecoveryManagerImpl) CreateWithRecovery(ctx context.Context, req opena
 
 			if strings.Contains(errStr, "prompt") && strings.Contains(errStr, "long") {
 				fmt.Printf("[Recovery] Prompt too long. Compacting... (attempt %d)\n", attempt+1)
-				*messages = rm.contextMgr.AutoCompact(*messages)
+				*messages = rm.contextMgr.AutoCompact(*messages, req.Model)
 				req.Messages = append([]openai.ChatCompletionMessage{
 					{
 						Role:    openai.ChatMessageRoleSystem,

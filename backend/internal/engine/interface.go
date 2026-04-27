@@ -21,7 +21,7 @@ type PromptBuilder interface {
 
 type ContextManager interface {
 	MicroCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
-	AutoCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage
+	AutoCompact(messages []openai.ChatCompletionMessage, model string) []openai.ChatCompletionMessage
 	EstimateTokens(messages []openai.ChatCompletionMessage) int
 	SaveLargeOutput(toolName, output string) string
 }

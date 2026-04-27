@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/session.dart';
 import '../models/message.dart';
 import '../providers/session_provider.dart';
+import '../providers/settings_provider.dart';
 import 'message_bubble.dart';
 
 class SessionDetailDialog extends StatefulWidget {
@@ -190,6 +191,7 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
         widget.sessionId,
         input,
         mode: _currentMode.name,
+        model: _currentModel,
       );
 
       setState(() {
@@ -617,6 +619,23 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
     final isRunning = session.state == SessionState.processing ||
         session.state == SessionState.planning;
 
+    final settingsProvider = context.watch<SettingsProvider>();
+    final List<String> availableModels = settingsProvider.config?.models.isNotEmpty == true
+        ? settingsProvider.config!.models
+        : ['glm-5'];
+
+    String displayModel = _currentModel;
+    if (!availableModels.contains(displayModel)) {
+      displayModel = availableModels.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _currentModel != displayModel) {
+          setState(() {
+            _currentModel = displayModel;
+          });
+        }
+      });
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -722,27 +741,15 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
                 border: Border.all(color: Colors.grey[300]!),
               ),
               child: DropdownButton<String>(
-                value: _currentModel,
+                value: displayModel,
                 underline: const SizedBox(),
                 icon: const Icon(Icons.arrow_drop_down, size: 18),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'glm-5',
-                    child: Text('GLM-5', style: TextStyle(fontSize: 12)),
-                  ),
-                  DropdownMenuItem(
-                    value: 'glm-4',
-                    child: Text('GLM-4', style: TextStyle(fontSize: 12)),
-                  ),
-                  DropdownMenuItem(
-                    value: 'qwen-max',
-                    child: Text('Qwen-Max', style: TextStyle(fontSize: 12)),
-                  ),
-                  DropdownMenuItem(
-                    value: 'qwen-plus',
-                    child: Text('Qwen-Plus', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
+                items: availableModels.map((model) {
+                  return DropdownMenuItem(
+                    value: model,
+                    child: Text(model.toUpperCase(), style: const TextStyle(fontSize: 12)),
+                  );
+                }).toList(),
                 onChanged: (_isSubmitting || isRunning)
                     ? null
                     : (value) {
@@ -787,7 +794,7 @@ class _SessionDetailDialogState extends State<SessionDetailDialog> {
                       );
                       if (confirmed == true) {
                         await provider.removeSession(session.id);
-                        if (context.mounted) Navigator.pop(context);
+                        if (mounted) Navigator.pop(context);
                       }
                     },
             ),

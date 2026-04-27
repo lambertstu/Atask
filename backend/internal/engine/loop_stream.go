@@ -23,6 +23,13 @@ func (e *AgentEngine) RunStream(
 ) ([]openai.ChatCompletionMessage, error) {
 	roundsSinceTodo := 0
 
+	currentModel := e.model
+	if sessionMgr != nil {
+		if sess := sessionMgr.GetSession(sessionID); sess != nil && sess.Model != "" {
+			currentModel = sess.Model
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -37,13 +44,13 @@ func (e *AgentEngine) RunStream(
 				"session_id": sessionID,
 				"action":     "auto_compact",
 			})
-			messages = e.contextMgr.AutoCompact(messages)
+			messages = e.contextMgr.AutoCompact(messages, currentModel)
 		}
 
 		system := e.promptBuilder.Build()
 
 		req := openai.ChatCompletionRequest{
-			Model: e.model,
+			Model: currentModel,
 			Messages: append([]openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
@@ -213,7 +220,7 @@ func (e *AgentEngine) RunStream(
 		}
 
 		if manualCompactRequested {
-			messages = e.contextMgr.AutoCompact(messages)
+			messages = e.contextMgr.AutoCompact(messages, currentModel)
 			if sessionMgr != nil {
 				sessionMgr.UpdateMessages(sessionID, messages)
 			}

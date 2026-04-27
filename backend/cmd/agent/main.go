@@ -88,7 +88,7 @@ func main() {
 	hookMgr := events.NewHookManager(cfg.WorkDir)
 
 	// 8. 创建引擎组件
-	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.ProjectRoot, cfg.Model)
+	promptBuilder := engine.NewSystemPromptBuilder(cfg.WorkDir, cfg.ProjectRoot)
 	contextMgr := engine.NewContextManager(llmClient, cfg.Model, cfg.WorkDir, cfg.ContextThreshold)
 	recoveryMgr := engine.NewRecoveryManager(llmClient, cfg.Model, contextMgr, promptBuilder)
 
@@ -122,6 +122,7 @@ func main() {
 		MemoryMgr:     memoryMgr,
 		PromptBuilder: promptBuilder,
 		ContextMgr:    contextMgr,
+		Model:         cfg.Model,
 	}
 
 	// 12. 启动 REPL

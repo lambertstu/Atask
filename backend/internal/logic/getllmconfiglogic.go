@@ -33,6 +33,7 @@ func (l *GetLLMConfigLogic) GetLLMConfig() (resp *types.LLMConfigResponse, err e
 		APIKey:    l.svcCtx.LLMConfigMgr.MaskAPIKey(),
 		BaseURL:   cfg.BaseURL,
 		Model:     cfg.Model,
+		Models:    cfg.Models,
 		HasAPIKey: l.svcCtx.LLMConfigMgr.HasAPIKey(),
 		UpdatedAt: cfg.UpdatedAt,
 	}, nil

@@ -156,9 +156,9 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> submitInput(String sessionId, String input, {String? mode}) async {
+  Future<void> submitInput(String sessionId, String input, {String? mode, String? model}) async {
     try {
-      final session = await _api.submitInput(sessionId, input, mode: mode);
+      final session = await _api.submitInput(sessionId, input, mode: mode, model: model);
       _updateSession(session);
       subscribeToSession(sessionId);
       await _fetchSessionMessages(sessionId);

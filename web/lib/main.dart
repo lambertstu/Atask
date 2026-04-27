@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/session_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/board_screen.dart';
 
 void main() {
@@ -12,8 +13,15 @@ class AtaskApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => SessionProvider()..loadProjects()..loadSessions(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => SessionProvider()..loadProjects()..loadSessions(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider()..loadConfig(),
+        ),
+      ],
       child: MaterialApp(
         title: 'Atask Board',
         theme: ThemeData(

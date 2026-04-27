@@ -118,7 +118,7 @@ func (em *EngineManager) createEngineContext(workDir string) *EngineContext {
 
 	hookMgr := events.NewHookManager(workDir)
 
-	promptBuilder := NewSystemPromptBuilder(workDir, em.projectRoot, em.config.Model)
+	promptBuilder := NewSystemPromptBuilder(workDir, em.projectRoot)
 	contextMgr := NewContextManager(em.llmClient, em.config.Model, workDir, em.config.ContextThreshold)
 	recoveryMgr := NewRecoveryManager(em.llmClient, em.config.Model, contextMgr, promptBuilder)
 

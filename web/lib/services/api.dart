@@ -103,11 +103,12 @@ class ApiService {
     }
   }
 
-  Future<Session> submitInput(String id, String input, {String? mode}) async {
+  Future<Session> submitInput(String id, String input, {String? mode, String? model}) async {
     try {
       final resp = await _dio.post('/api/sessions/$id/input', data: {
         'input': input,
         if (mode != null) 'mode': mode,
+        if (model != null) 'model': model,
       });
       return Session.fromJson(resp.data);
     } on DioException catch (e) {

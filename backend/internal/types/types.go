@@ -42,17 +42,19 @@ type GetSessionRequest struct {
 }
 
 type LLMConfigRequest struct {
-	APIKey  string `json:"api_key,optional"`
-	BaseURL string `json:"base_url,optional"`
-	Model   string `json:"model,optional"`
+	APIKey  string   `json:"api_key,optional"`
+	BaseURL string   `json:"base_url,optional"`
+	Model   string   `json:"model,optional"`
+	Models  []string `json:"models,optional"`
 }
 
 type LLMConfigResponse struct {
-	APIKey    string `json:"api_key"`
-	BaseURL   string `json:"base_url"`
-	Model     string `json:"model"`
-	HasAPIKey bool   `json:"has_api_key"`
-	UpdatedAt string `json:"updated_at"`
+	APIKey    string   `json:"api_key"`
+	BaseURL   string   `json:"base_url"`
+	Model     string   `json:"model"`
+	Models    []string `json:"models"`
+	HasAPIKey bool     `json:"has_api_key"`
+	UpdatedAt string   `json:"updated_at"`
 }
 
 type ProjectListResponse struct {
@@ -107,6 +109,7 @@ type SubmitInputRequest struct {
 	ID    string `path:"id"`
 	Input string `json:"input"`
 	Mode  string `json:"mode,optional"`
+	Model string `json:"model,optional"`
 }
 
 type ToolCall struct {

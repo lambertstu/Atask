@@ -97,7 +97,7 @@ func (cm *ContextManagerImpl) MicroCompact(messages []openai.ChatCompletionMessa
 	return messages
 }
 
-func (cm *ContextManagerImpl) AutoCompact(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessage {
+func (cm *ContextManagerImpl) AutoCompact(messages []openai.ChatCompletionMessage, model string) []openai.ChatCompletionMessage {
 	transcriptDir := filepath.Join(cm.workdir, TRANSCRIPT_DIR)
 	os.MkdirAll(transcriptDir, 0755)
 
@@ -121,7 +121,7 @@ func (cm *ContextManagerImpl) AutoCompact(messages []openai.ChatCompletionMessag
 	prompt := fmt.Sprintf("Summarize this conversation for continuity. Include:\n1) What was accomplished\n2) Current state\n3) Key decisions made\nBe concise but preserve critical details.\n\n%s", conversationText)
 
 	resp, err := cm.client.CreateCompletion(context.Background(), openai.ChatCompletionRequest{
-		Model: cm.model,
+		Model: model,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,

@@ -14,14 +14,12 @@ const DYNAMIC_BOUNDARY = "=== DYNAMIC_BOUNDARY ==="
 type SystemPromptBuilder struct {
 	workdir    string
 	projectDir string
-	model      string
 }
 
-func NewSystemPromptBuilder(workdir, projectDir, model string) *SystemPromptBuilder {
+func NewSystemPromptBuilder(workdir, projectDir string) *SystemPromptBuilder {
 	return &SystemPromptBuilder{
 		workdir:    workdir,
 		projectDir: projectDir,
-		model:      model,
 	}
 }
 
@@ -159,7 +157,6 @@ func (b *SystemPromptBuilder) buildDynamicContext() string {
 	lines := []string{
 		fmt.Sprintf("Current date: %s", time.Now().Format("2006-01-02")),
 		fmt.Sprintf("Working directory: %s", b.workdir),
-		fmt.Sprintf("Model: %s", b.model),
 		fmt.Sprintf("Platform: %s", hostname),
 	}
 	return "# Dynamic context\n" + strings.Join(lines, "\n")

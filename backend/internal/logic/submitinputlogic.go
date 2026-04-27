@@ -35,7 +35,7 @@ func (l *SubmitInputLogic) SubmitInput(req *types.SubmitInputRequest) (*types.Se
 		mode = security.PlanMode
 	}
 
-	if err := l.svcCtx.SessionManager.SubmitInput(req.ID, req.Input, mode); err != nil {
+	if err := l.svcCtx.SessionManager.SubmitInput(req.ID, req.Input, mode, req.Model); err != nil {
 		return nil, err
 	}
 
